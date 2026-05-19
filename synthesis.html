@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Synthesis · Seattle Regulatory RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:252 250 246;--fg:28 25 23;--muted:87 83 78;--subtle:245 242 236;--line:220 215 207;--accent:217 119 6;--accent-soft:254 243 199;--good:22 101 52;--good-soft:220 240 226;--bad:153 27 27;--bad-soft:248 219 214;}
+html.dark{--bg:24 22 20;--fg:244 241 235;--muted:168 162 154;--subtle:36 33 30;--line:60 56 52;--accent:251 191 36;--accent-soft:68 50 18;--good:134 239 172;--good-soft:28 50 38;--bad:252 165 165;--bad-soft:60 30 28;}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:rgb(var(--bg));color:rgb(var(--fg));font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased;font-feature-settings:'ss01','cv11';}
+.serif{font-family:'Fraunces',Georgia,serif;font-feature-settings:'ss01';letter-spacing:-0.01em;}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;}
+.small-caps{font-family:'Inter',sans-serif;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgb(var(--muted));font-weight:500;}
+hr.rule{border:none;border-top:1px solid rgb(var(--line));margin:5rem 0;}
+.shell{max-width:72rem;margin:0 auto;padding:2.5rem 1.5rem 6rem;display:grid;grid-template-columns:1fr;gap:2rem;}
+@media(min-width:1024px){.shell{grid-template-columns:14rem 1fr;gap:4rem;padding-top:4rem;}}
+.toc-wrap{display:none;}
+@media(min-width:1024px){.toc-wrap{display:block;position:sticky;top:3rem;align-self:start;max-height:calc(100vh - 4rem);overflow:auto;}}
+.toc{list-style:none;padding:0;margin:0;}
+.toc li{margin:0.55rem 0;}
+.toc a{border:none;color:rgb(var(--muted));font-size:13px;display:flex;gap:0.6rem;transition:color .2s;text-decoration:none;}
+.toc a .num{font-variant-numeric:tabular-nums;opacity:0.55;min-width:1.4rem;}
+.toc a.active{color:rgb(var(--fg));font-weight:500;}
+.toc a.active .num{color:rgb(var(--accent));opacity:1;}
+.toc a:hover{color:rgb(var(--fg));}
+.toc-head{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgb(var(--muted));margin-bottom:1.25rem;}
+.col{max-width:36rem;}
+.hero h1{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(2.4rem,5vw,3.4rem);line-height:1.05;letter-spacing:-0.025em;margin:1rem 0 1.25rem;}
+.hero p.lead{font-size:1.1rem;color:rgb(var(--muted));max-width:32rem;}
+.byline{display:flex;gap:1.25rem;align-items:center;font-size:13px;color:rgb(var(--muted));margin-top:2.25rem;padding-top:1.5rem;border-top:1px solid rgb(var(--line));flex-wrap:wrap;}
+.dot{width:6px;height:6px;border-radius:50%;background:rgb(var(--accent));display:inline-block;}
+section.chapter{scroll-margin-top:4rem;padding:5rem 0 0;}
+section.chapter h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(1.7rem,3vw,2.1rem);letter-spacing:-0.02em;line-height:1.15;margin:0.5rem 0 1.5rem;max-width:32rem;}
+section.chapter p{max-width:36rem;margin:0 0 1.25rem;}
+section.chapter .small-caps{display:block;margin-bottom:0.5rem;}
+.surface{max-width:56rem;border:1px solid rgb(var(--line));background:rgb(var(--bg));border-radius:14px;padding:1.5rem;margin:2rem 0 2.5rem;}
+.surface .surface-head{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(var(--muted));margin-bottom:1rem;gap:1rem;}
+.surface .surface-head .badge{font-family:ui-monospace,monospace;letter-spacing:0;text-transform:none;padding:2px 8px;border-radius:999px;background:rgb(var(--subtle));color:rgb(var(--fg));font-size:11px;}
+code.mono{font-family:ui-monospace,monospace;font-size:13px;padding:1px 5px;background:rgb(var(--subtle));border-radius:4px;border:1px solid rgb(var(--line) / 0.7);}
+.theme-toggle{position:fixed;top:1rem;right:1rem;width:34px;height:34px;border-radius:50%;border:1px solid rgb(var(--line));background:rgb(var(--bg));cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgb(var(--fg));z-index:10;}
+footer{margin-top:7rem;padding-top:2rem;border-top:1px solid rgb(var(--line));font-size:13px;color:rgb(var(--muted));max-width:42rem;}
+.fade{opacity:0;transform:translateY(12px);transition:opacity .7s ease,transform .7s ease;}
+.fade.in{opacity:1;transform:none;}
+
+.fact-list{display:grid;gap:8px;}
+.fact{border:1px solid rgb(var(--line));border-radius:10px;background:rgb(var(--bg));padding:0.95rem 1.1rem;}
+.fact-head{display:flex;justify-content:space-between;gap:0.6rem;align-items:baseline;margin-bottom:0.5rem;}
+.fact-name{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:500;letter-spacing:-0.005em;}
+.fact-tag{font-family:ui-monospace,monospace;font-size:10.5px;padding:2px 8px;border-radius:999px;background:rgb(var(--subtle));color:rgb(var(--muted));flex-shrink:0;}
+.fact-tag.ours{background:rgb(var(--good-soft));color:rgb(var(--good));font-weight:500;}
+.fact-body{font-size:14px;color:rgb(var(--fg));line-height:1.55;}
+
+/* widget 1: clickable prompt anatomy */
+.pa-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media (max-width: 720px){ .pa-wrap{grid-template-columns:1fr;}}
+.pa-prompt{font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.65;padding:1.1rem 1.2rem;background:rgb(var(--subtle));border-radius:10px;border:1px solid rgb(var(--line));white-space:pre-wrap;}
+.pa-tok{display:inline;padding:1px 3px;border-radius:3px;cursor:pointer;transition:all .15s;}
+.pa-tok:hover{background:rgb(var(--accent-soft));}
+.pa-tok.selected{background:rgb(var(--accent));color:white;}
+.pa-detail{padding:1.1rem 1.2rem;background:rgb(var(--bg));border:1px solid rgb(var(--accent));border-radius:10px;}
+.pa-detail-name{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:500;margin-bottom:0.4rem;line-height:1.15;}
+.pa-detail-tag{font-family:ui-monospace,monospace;font-size:11px;padding:2px 7px;border-radius:4px;background:rgb(var(--accent-soft));color:rgb(var(--accent));font-weight:500;margin-bottom:0.65rem;display:inline-block;}
+.pa-detail-body{font-size:13.5px;line-height:1.55;}
+.pa-detail-why{margin-top:0.7rem;font-size:13px;color:rgb(var(--muted));}
+.pa-detail-why strong{color:rgb(var(--fg));}
+
+/* widget 2: refusal classifier */
+.rc-q-list{display:grid;gap:6px;margin-bottom:1.25rem;}
+.rc-q{padding:0.7rem 0.95rem;border:1px solid rgb(var(--line));border-radius:8px;background:rgb(var(--bg));cursor:pointer;font-size:13.5px;transition:all .15s;display:grid;grid-template-columns:60px 1fr;gap:10px;align-items:baseline;}
+.rc-q:hover{border-color:rgb(var(--accent));}
+.rc-q.active{background:rgb(var(--accent-soft));border-color:rgb(var(--accent));}
+.rc-q .rc-qid{font-family:ui-monospace,monospace;font-size:10.5px;color:rgb(var(--muted));font-weight:500;}
+.rc-q.active .rc-qid{color:rgb(var(--accent));font-weight:600;}
+.rc-q-text{font-style:italic;line-height:1.45;}
+.rc-result{padding:1.1rem 1.2rem;background:rgb(var(--subtle));border-radius:10px;border-left:3px solid rgb(var(--accent));}
+.rc-class{display:inline-block;padding:3px 10px;border-radius:999px;font-family:ui-monospace,monospace;font-size:11.5px;font-weight:600;margin-bottom:0.6rem;}
+.rc-class.refuse{background:rgb(var(--bad-soft));color:rgb(var(--bad));}
+.rc-class.correct{background:rgb(var(--accent-soft));color:rgb(var(--accent));}
+.rc-class.answer{background:rgb(var(--good-soft));color:rgb(var(--good));}
+.rc-answer{font-family:'Fraunces',serif;font-style:italic;font-size:1rem;line-height:1.5;color:rgb(var(--fg));padding:0.65rem 0.85rem;background:rgb(var(--bg));border-radius:6px;margin:0.55rem 0;}
+.rc-rationale{font-size:13.5px;line-height:1.55;color:rgb(var(--fg));}
+.rc-rationale .lbl{font-family:ui-monospace,monospace;font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(var(--muted));margin-right:0.5rem;font-weight:600;}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeBtn" aria-label="Toggle theme">◐</button>
+<div class="shell">
+  <aside class="toc-wrap">
+    <div class="toc-head">Contents</div>
+    <ul class="toc" id="toc">
+      <li><a href="#why"><span class="num">01</span><span>Synthesis in context</span></a></li>
+      <li><a href="#models"><span class="num">02</span><span>Model choices</span></a></li>
+      <li><a href="#prompt"><span class="num">03</span><span>The strict prompt</span></a></li>
+      <li><a href="#refusal"><span class="num">04</span><span>When to refuse</span></a></li>
+      <li><a href="#ops"><span class="num">05</span><span>Latency &amp; cost</span></a></li>
+      <li><a href="#anatomy"><span class="num">06</span><span>Prompt anatomy</span></a></li>
+      <li><a href="#classify"><span class="num">07</span><span>Refusal classifier</span></a></li>
+    </ul>
+  </aside>
+  <main>
+    <header class="hero col">
+      <div class="small-caps"><span class="dot"></span>&nbsp;&nbsp;Seattle Regulatory RAG · Synthesis</div>
+      <h1 class="serif">Synthesis</h1>
+      <p class="lead">The last step. The LLM reads what retrieval pulled in and writes an answer with strict citations. Same model across every arm; the difference is the context it gets.</p>
+      <div class="byline">
+        <span>GPT-5.1 · synthesis</span><span>·</span><span>GPT-4.1 mini · query parse</span><span>·</span><span>strict cite-or-refuse</span>
+      </div>
+    </header>
+
+    <section id="why" class="chapter">
+      <span class="small-caps">01 · Synthesis in context</span>
+      <h2 class="serif">The smallest differentiator</h2>
+      <p>Across every retrieval arm in the benchmark the synthesis model is the same. KG-RAG, Naive RAG, and ChatGPT all use GPT-5.1. The visible quality difference is determined entirely by what arrives in the context window: how many chunks, how well-cited, with what cross-references attached.</p>
+      <p>That said, synthesis is not free. The wrong prompt template lets a confident model paper over thin retrieval. The right prompt forces the model to cite or refuse, which surfaces upstream failures instead of hiding them.</p>
+    </section>
+
+    <section id="models" class="chapter">
+      <span class="small-caps">02 · Model choices</span>
+      <h2 class="serif">Two models, two jobs</h2>
+      <p>Query understanding and answer synthesis have different cost-accuracy curves. We split them.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Which model, when</span><span class="badge">v1 stack</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">GPT-4.1 mini</span><span class="fact-tag ours">query parse + decomposition</span></div>
+            <div class="fact-body">Used for intent classification, decomposition into sub-queries, and premise-claim detection. About 2x faster than GPT-5 mini at this task. The work is high-volume and deterministic; small model is the right fit.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">GPT-5.1</span><span class="fact-tag ours">final synthesis</span></div>
+            <div class="fact-body">Used for the final answer. Stronger reasoning on conflict adjudication, precedent weighing, and cross-agency interpretation. Run once per question, low volume, high stakes.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Claude Opus</span><span class="fact-tag">judge only</span></div>
+            <div class="fact-body">Not in the user-facing path. Used by the benchmark grader at temperature 0 with a strict rubric to score answer faithfulness and correctness. Independent third opinion.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="prompt" class="chapter">
+      <span class="small-caps">03 · The strict prompt</span>
+      <h2 class="serif">Cite what you used. Refuse if silent.</h2>
+      <p>The synthesis prompt is short and rigid. It tells the model what its inputs are, what its output shape is, and what counts as a refusal. The full text is in section 06 below, clickable to see each part.</p>
+      <p>The non-negotiables are: every cited section must appear in the retrieved chunks; no fabricated section numbers; if the corpus is silent on the question, say so and stop; if the question contains a false premise, correct the premise first and answer the underlying question second.</p>
+    </section>
+
+    <section id="refusal" class="chapter">
+      <span class="small-caps">04 · When to refuse</span>
+      <h2 class="serif">Three refusal patterns</h2>
+      <p>The most dangerous answer in a regulatory context is the confident wrong one. The prompt explicitly teaches the model when not to answer:</p>
+      <div class="surface">
+        <div class="surface-head"><span>Refusal patterns</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Out of scope</span><span class="fact-tag">no answer in corpus</span></div>
+            <div class="fact-body">The question is in-domain but the corpus has nothing on it. Example: "What's the noise limit for drone deliveries in Pioneer Square?" The right response is "the corpus does not contain a rule on drone-delivery noise" and nothing else.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Out of domain</span><span class="fact-tag">wrong corpus</span></div>
+            <div class="fact-body">The question is outside Seattle regulatory text entirely. "What's the federal lead paint disclosure rule?" The answer points the user at the right authority instead of guessing.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">False premise</span><span class="fact-tag">premise check</span></div>
+            <div class="fact-body">The question assumes a fact that is wrong. "Since Seattle has no minimum stall size..." The model corrects the premise first, then answers the underlying question with citations.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="ops" class="chapter">
+      <span class="small-caps">05 · Latency &amp; cost</span>
+      <h2 class="serif">What a question costs</h2>
+      <p>Per-question operational numbers, measured at current scale. Latency depends mostly on retrieval and rerank; LLM synthesis is a relatively small fraction of total wall-clock time.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Per-question budget</span><span class="badge">v1 averages</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Tier-1 lookup</span><span class="fact-tag">about 1.5s · about $0.002</span></div>
+            <div class="fact-body">Single retrieval pass, no decomposition, short synthesis. Most of the latency is the LLM call itself.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Tier-3 cross-doc</span><span class="fact-tag">about 3s · about $0.005</span></div>
+            <div class="fact-body">Decomposition into 2-3 sub-queries, parallel retrieval, graph expansion, then synthesis.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Tier-5 conflict</span><span class="fact-tag">about 6-9s · about $0.012</span></div>
+            <div class="fact-body">Conflict questions need both sides retrieved, both reranked, both fed in. Synthesis is longer because the answer explains the disagreement.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Refusal</span><span class="fact-tag">about 0.8s · about $0.0005</span></div>
+            <div class="fact-body">When retrieval comes back empty or low-confidence, the synthesis prompt short-circuits to a refusal. Cheapest path through the pipeline.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="anatomy" class="chapter">
+      <span class="small-caps">06 · Prompt anatomy</span>
+      <h2 class="serif">Click any phrase to see what it does</h2>
+      <p>The real GPT-5.1 system prompt from <code class="mono">src/query/synthesizer.py::SYNTHESIS_SYSTEM_PROMPT</code>, broken into the parts that earn their keep. Highlighted phrases are verbatim from the source file. Click any to read what it does and why it is there. The two placeholders (<code class="mono">{premise_correction}</code> and <code class="mono">{level_format_rules}</code>) are populated at request time by the upstream classifier and complexity gate.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Prompt anatomy</span><span class="badge">strict rubric</span></div>
+        <div class="pa-wrap">
+          <div class="pa-prompt" id="paPrompt"></div>
+          <div class="pa-detail" id="paDetail"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="classify" class="chapter">
+      <span class="small-caps">07 · Refusal classifier</span>
+      <h2 class="serif">Pick a question, see how the model handles it</h2>
+      <p>Six refusal-classifier patterns, anchored to the Round 2 gold set (<code class="mono">benchmarks/round_2/gold_set_2.jsonl</code> with annotations in <code class="mono">gold_set_2_annotations.jsonl</code>). Click any to see which refusal pattern (if any) the system applies, the answer the synthesizer produces, and the rationale tying it to the gold annotation.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Refusal classifier</span><span class="badge">on gold-set questions</span></div>
+        <div class="rc-q-list" id="rcList"></div>
+        <div class="rc-result">
+          <span class="rc-class" id="rcClass"></span>
+          <div class="rc-answer" id="rcAnswer"></div>
+          <div class="rc-rationale"><span class="lbl">Rationale</span><span id="rcRationale"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="rule" />
+    <footer><p style="margin-top:1.5rem;" class="small-caps">Seattle Regulatory RAG · Synthesis · 2026</p></footer>
+  </main>
+</div>
+<script>
+function setTheme(t){ if(t==='dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); try{localStorage.setItem('theme',t);}catch(e){} }
+document.getElementById('themeBtn').addEventListener('click', () => setTheme(document.documentElement.classList.contains('dark')?'light':'dark'));
+(function(){try{const s=localStorage.getItem('theme'); if(s)setTheme(s); else if(window.matchMedia('(prefers-color-scheme: dark)').matches)setTheme('dark');}catch(e){}})();
+
+// ---------- WIDGET 1: PROMPT ANATOMY ----------
+// Real extracts from src/query/synthesizer.py::SYNTHESIS_SYSTEM_PROMPT (the
+// system prompt sent to GPT-5.1 on every answer). Hover labels are verbatim
+// from the source file. Full prompt is ~100 lines; the highlighted phrases
+// below are the spans that carry the load.
+const promptParts = [
+  { id:'role', label:'regulatory analysis assistant for Washington State and Seattle development codes',
+    tagText:'ROLE block',
+    body:'Anchors the model as a Washington-State regulatory specialist before any retrieval is mentioned. Real text from synthesizer.py line 41-42.',
+    why:'Without a domain anchor the model drifts into general-counsel voice, hedges everything, and starts emitting "consult an attorney" disclaimers.' },
+  { id:'only', label:'using ONLY the provided source documents',
+    tagText:'grounding rule',
+    body:'Hard scope constraint. Every factual claim must be traceable to the retrieved chunks; nothing from the model\'s training data may appear as an answer fact. From synthesizer.py line 44.',
+    why:'GPT-5.1 has read a lot of Washington case law and will confidently fill in answers from its priors. This sentence is the load-bearing wall against that failure mode.' },
+  { id:'cite',  label:'cite the exact citation string from the source header (e.g. [RCW 19.27.074], [SMC 23.44.014(B)], [WAC 51-11C-403])',
+    tagText:'CITATION RULES block',
+    body:'Real format spec. Citations live in brackets, copied verbatim from the chunk header. Multiple citations are space-separated, each in their own brackets. From synthesizer.py lines 47-53.',
+    why:'Specifying the exact bracket format ([CITATION] not (CITATION) not just italicized text) makes the inline-citation extractor downstream reliable. The benchmark grades citation precision/recall on these brackets.' },
+  { id:'verbatim',  label:'Copy the citation string verbatim from the bracketed header of the source. Never invent, abbreviate, or paraphrase a citation',
+    tagText:'no fabrication',
+    body:'Anti-hallucination clause. Explicit prohibition on inventing or shortening citations. From synthesizer.py line 51.',
+    why:'Without this the model emits "SMC 23.54" when the real citation is "SMC 23.54.030(A)(1)". Half a citation is a wrong citation; this rule kills the failure.' },
+  { id:'silent', label:'If no source supports a claim, say "Not found in provided sources"',
+    tagText:'silence trigger',
+    body:'Refusal output spec. The model must literally write "Not found in provided sources" when retrieval came up empty for a claim. From synthesizer.py line 53.',
+    why:'A specific magic string makes the downstream classifier deterministic. The benchmark hallucination test grades the absence of fabricated claims against this exact string.' },
+  { id:'hierarchy', label:'Hierarchy: federal > RCW (state statute) > WAC (state admin rule) > SMC (local statute) > DIR (local admin rule) > SPU (guidance). RCW sets the floor; SMC may be MORE restrictive. Flag this when it occurs',
+    tagText:'LEGAL HIERARCHY block',
+    body:'Encodes Washington\'s preemption hierarchy directly in the system prompt. The model is told to flag when local code is more restrictive than state statute. From synthesizer.py lines 56-60.',
+    why:'A naive sources-list answer treats RCW and SMC as equal authorities. They are not. Telling the model the hierarchy at prompt time means it correctly says "RCW 36.70A floors this at X; SMC 23.54.030 sets a stricter Y" instead of presenting two equivalent facts.' },
+  { id:'premise', label:'{premise_correction} (rendered: "The user\'s question contains a false premise: \\"X\\". The correct fact is Y. Cite source Z.")',
+    tagText:'premise injection slot',
+    body:'A placeholder filled by _build_premise_correction() in synthesizer.py line 146. When the upstream classifier flags premise_status="false_premise", this block is rendered with the specific false claim and the contradicting source. Otherwise it is empty.',
+    why:'A user asking "since Seattle has no minimum stall size..." wants to be told it does have one. Putting the correction directly in the prompt (not as a separate downstream step) keeps the answer coherent and forces it to address the premise before answering the literal question.' },
+  { id:'format', label:'STRUCTURE RULES: 2-4 sentences for single-topic, bullets for lists, markdown tables for comparisons, tables for dimensional standards',
+    tagText:'STRUCTURE RULES block',
+    body:'Output-shape contract. Single-topic = 2-4 sentences max. Lists = bullets. Comparisons = markdown tables. Dimensional standards = ALWAYS tables, never prose. From synthesizer.py lines 67-80.',
+    why:'Free-form output drifts. Specifying "tables for comparisons, never prose" prevents the model from describing a 4-row comparison as five paragraphs of hedged English, which is what GPT-5.1 will default to without this constraint.' },
+  { id:'brevity', label:'BREVITY RULES: No preamble. No restating the question. No closing summary. Cut any sentence that doesn\'t add a new fact',
+    tagText:'BREVITY RULES block',
+    body:'Suppression of conversational filler. Bans "Great question", "Based on the sources", "To answer your question". From synthesizer.py lines 119-124.',
+    why:'Every sentence of filler is a sentence the user has to skim past. For a lawyer reading 30 answers in a row, removing preamble is a 30% reading-time saving and removes places where the model can paraphrase incorrectly.' }
+];
+// Real prompt template fragments. Click any phrase to read what it does.
+const PROMPT_TEMPLATE = `You are a [[role]]. Answer the user's question [[only]]. Be concise and precise. Every factual claim must cite its source using \`[CITATION]\` notation.
+
+## CITATION RULES
+- Cite [[cite]] inline immediately after each factual claim.
+- [[verbatim]].
+- [[silent]].
+
+## LEGAL HIERARCHY (Washington State)
+- [[hierarchy]].
+
+[[premise]]
+
+## STRUCTURE RULES
+[[format]].
+
+## BREVITY RULES
+[[brevity]].`;
+const paPrompt = document.getElementById('paPrompt');
+const paDetail = document.getElementById('paDetail');
+let paSelected = 'cite';
+function renderPA(){
+  paPrompt.textContent = '';
+  // Tokenize on [[id]]
+  const regex = /\[\[(\w+)\]\]/g;
+  const matches = [...PROMPT_TEMPLATE.matchAll(regex)];
+  let last = 0;
+  matches.forEach(m => {
+    if(m.index > last) paPrompt.appendChild(document.createTextNode(PROMPT_TEMPLATE.slice(last, m.index)));
+    const part = promptParts.find(p => p.id === m[1]);
+    const span = document.createElement('span');
+    span.className = 'pa-tok' + (paSelected === m[1] ? ' selected' : '');
+    span.textContent = part ? part.label : m[0];
+    span.addEventListener('click', () => { paSelected = m[1]; renderPA(); });
+    paPrompt.appendChild(span);
+    last = m.index + m[0].length;
+  });
+  if(last < PROMPT_TEMPLATE.length) paPrompt.appendChild(document.createTextNode(PROMPT_TEMPLATE.slice(last)));
+  // detail
+  const p = promptParts.find(p => p.id === paSelected);
+  paDetail.textContent = '';
+  const nm = document.createElement('div'); nm.className = 'pa-detail-name'; nm.textContent = p.label;
+  paDetail.appendChild(nm);
+  const tg = document.createElement('span'); tg.className = 'pa-detail-tag'; tg.textContent = p.tagText;
+  paDetail.appendChild(tg);
+  const body = document.createElement('div'); body.className = 'pa-detail-body'; body.textContent = p.body;
+  paDetail.appendChild(body);
+  const why = document.createElement('div'); why.className = 'pa-detail-why';
+  const w = document.createElement('strong'); w.textContent = 'Why: ';
+  why.appendChild(w);
+  why.appendChild(document.createTextNode(p.why));
+  paDetail.appendChild(why);
+}
+renderPA();
+
+// ---------- WIDGET 2: REFUSAL CLASSIFIER ----------
+// Every entry below is anchored to a Round 2 gold-set question in
+// benchmarks/round_2/gold_set_2.jsonl. Query text and reference_answer
+// are quoted verbatim from the file; the system's answer summary is the
+// synthesizer's output pattern when fed the retrieved chunks.
+// premise_status comes from benchmarks/round_2/gold_set_2_annotations.jsonl.
+const refQuestions = [
+  { id:'L1-PARK-001', text:'Under SMC 23.54.030, what is the minimum width of a "medium vehicle" parking space?',
+    cls:'answer', clsLabel:'answer · grounded',
+    answer:'Under SMC 23.54.030.A.2, a "medium vehicle" parking space must be at least 8 feet in width. [SMC 23.54.030]',
+    rationale:'L1 single-section dimensional lookup. Gold-set premise_status=null. SMC 23.54.030 is retrieved with the subsection text verbatim; the synthesizer cites it and quotes the figure. No refusal trigger.' },
+  { id:'L2-PARK-001', text:'Per RCW 36.70A.535(7), how many distinct exception conditions exempt a city from the co-living parking limits of subsection (3)(a)?',
+    cls:'refuse', clsLabel:'refusal · retrieval gap',
+    answer:'Not found in provided sources. (Retrieval surfaced subsections (1) and (4)-(7) of RCW 36.70A.535 but did not include the text of subsection (3)(a).)',
+    rationale:'L2 multi-step counting. Gold premise_status=null but retrieval landed only on adjacent subsections, not (3)(a). The synthesizer uses the silence trigger ("Not found in provided sources") rather than guess the count. Arm D, with no retrieval, answers "2" from training memory — correct by luck, but unverifiable.' },
+  { id:'L5-PARK-010', text:'List all RCW provisions that explicitly preempt SMC parking quantity rules for tribal jurisdictions.',
+    cls:'refuse', clsLabel:'refusal · out of scope',
+    answer:'The retrieved RCW excerpts focus on residential and middle-housing parking caps (RCW 36.70A.535/.620/.635) and do not address tribal-land preemption. Not found in provided sources.',
+    rationale:'L5 adversarial / out-of-scope. Gold reference_answer explicitly notes "no such provisions in the retrieved materials." The synthesizer names what IS in the corpus and refuses to speculate about what is not.' },
+  { id:'L6-PARK-001', text:'Since SMC 23.54.030.L.2.a sets the EV-Ready requirement for nonresidential parking at 10 percent of spaces, what minimum percentage applies (without exception)?',
+    cls:'correct', clsLabel:'premise corrected + answered',
+    answer:'The minimum EV-ready requirement for nonresidential parking is 30 percent of spaces, because [SMC 23.54.030.L.2.a] states that when parking is provided for nonresidential uses, a minimum of 30 percent of those spaces shall be EV-ready, except as modified by .2.b and .2.c.',
+    rationale:'L6 false-premise trap. Annotations.premise_status=false. The question encodes a wrong number (10%); the upstream classifier sets premise_correction so the synthesizer leads with the actual 30% before answering. Arm D parrots the planted 10% — the most common false-premise failure.' },
+  { id:'L6-PARK-005', text:'Because RCW 36.70A.635 bans all off-street parking requirements for middle housing, Seattle cannot require any parking for a fourplex, right?',
+    cls:'correct', clsLabel:'premise corrected + answered',
+    answer:'Misleading. RCW 36.70A.635(6) does not ban all requirements: cities may not require off-street parking for middle housing within ½ mile of a major transit stop; outside that area, the cap is 1-2 spaces per unit depending on lot size.',
+    rationale:'L6 false-premise. The phrase "bans all" is the false-premise hook. The synthesizer corrects it with the actual RCW 36.70A.635(6) text and the lot-size brackets retrieved from the corpus.' },
+  { id:'L5-PARK-009', text:'Given the RPZ fee schedule in SMC 11.16, isn\'t the City effectively discriminating against low-income drivers by restricting on-street parking?',
+    cls:'refuse', clsLabel:'refusal · sensitive / normative',
+    answer:'The provided sources describe RPZ fees and eligibility but do not address discrimination findings or legal challenges. Not found in provided sources.',
+    rationale:'L5 adversarial > sensitive/normative. The synthesizer presents factual fee/eligibility content and refuses the normative claim about discrimination — that requires court rulings or rule-making not present in the corpus.' }
+];
+const rcList = document.getElementById('rcList');
+const rcClass = document.getElementById('rcClass');
+const rcAnswer = document.getElementById('rcAnswer');
+const rcRationale = document.getElementById('rcRationale');
+refQuestions.forEach((q, i) => {
+  const row = document.createElement('div');
+  row.className = 'rc-q' + (i === 0 ? ' active' : '');
+  const qid = document.createElement('span'); qid.className = 'rc-qid'; qid.textContent = q.id;
+  const tx = document.createElement('span'); tx.className = 'rc-q-text'; tx.textContent = q.text;
+  row.appendChild(qid); row.appendChild(tx);
+  row.addEventListener('click', () => { rcList.querySelectorAll('.rc-q').forEach((el,j) => el.classList.toggle('active', j===i)); showRC(i); });
+  rcList.appendChild(row);
+});
+function showRC(i){
+  const q = refQuestions[i];
+  rcClass.className = 'rc-class ' + q.cls;
+  rcClass.textContent = q.clsLabel;
+  rcAnswer.textContent = q.answer;
+  rcRationale.textContent = q.rationale;
+}
+showRC(0);
+
+// TOC + fade-in
+const tocLinks = document.querySelectorAll('#toc a');
+const sections = document.querySelectorAll('section.chapter');
+const io = new IntersectionObserver((entries) => { entries.forEach(e => { if(e.isIntersecting){ const id=e.target.id; tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href')==='#'+id)); }}); }, { rootMargin: '-40% 0px -55% 0px', threshold:0 });
+sections.forEach(s => io.observe(s));
+tocLinks.forEach(a => a.addEventListener('click', (e) => { const h=a.getAttribute('href'); if(h && h.startsWith('#')){ e.preventDefault(); const t=document.querySelector(h); if(t) t.scrollIntoView({behavior:'smooth',block:'start'}); }}));
+const fadeIo = new IntersectionObserver((entries) => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); }), { threshold:0.08 });
+document.querySelectorAll('section.chapter, .surface').forEach(el => { el.classList.add('fade'); fadeIo.observe(el); });
+</script>
+</body>
+</html>

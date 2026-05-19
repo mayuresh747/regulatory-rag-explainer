@@ -1,0 +1,1969 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>How We Benchmark · Seattle Regulatory RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: 252 250 246;
+  --fg: 28 25 23;
+  --muted: 87 83 78;
+  --subtle: 245 242 236;
+  --line: 220 215 207;
+  --accent: 217 119 6;
+  --accent-soft: 254 243 199;
+  --good: 22 101 52;
+  --good-soft: 220 240 226;
+  --bad: 153 27 27;
+  --bad-soft: 248 219 214;
+}
+html.dark{
+  --bg: 24 22 20;
+  --fg: 244 241 235;
+  --muted: 168 162 154;
+  --subtle: 36 33 30;
+  --line: 60 56 52;
+  --accent: 251 191 36;
+  --accent-soft: 68 50 18;
+  --good: 134 239 172;
+  --good-soft: 28 50 38;
+  --bad: 252 165 165;
+  --bad-soft: 60 30 28;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01','cv11';
+}
+.serif{ font-family:'Fraunces', Georgia, serif; font-feature-settings:'ss01'; letter-spacing:-0.01em; }
+.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px; }
+.small-caps{ font-family:'Inter',sans-serif; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color: rgb(var(--muted)); font-weight:500; }
+.muted{ color: rgb(var(--muted)); }
+a{ color: rgb(var(--accent)); text-decoration: none; border-bottom:1px solid rgb(var(--accent) / 0.35);}
+hr.rule{ border:none; border-top:1px solid rgb(var(--line)); margin: 5rem 0; }
+
+.shell{ max-width: 72rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; display:grid; grid-template-columns: 1fr; gap: 2rem; }
+@media(min-width:1024px){
+  .shell{ grid-template-columns: 14rem 1fr; gap: 4rem; padding-top: 4rem;}
+}
+.toc-wrap{ display:none; }
+@media(min-width:1024px){
+  .toc-wrap{ display:block; position: sticky; top: 3rem; align-self: start; max-height: calc(100vh - 4rem); overflow:auto; }
+}
+.toc{ list-style:none; padding:0; margin:0; }
+.toc li{ margin: 0.55rem 0; }
+.toc a{ border:none; color: rgb(var(--muted)); font-size: 13px; display:flex; gap: 0.6rem; transition: color .2s; }
+.toc a .num{ font-variant-numeric: tabular-nums; opacity: 0.55; min-width: 1.4rem;}
+.toc a.active{ color: rgb(var(--fg)); font-weight:500; }
+.toc a.active .num{ color: rgb(var(--accent)); opacity:1; }
+.toc a:hover{ color: rgb(var(--fg)); }
+.toc-head{ font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:rgb(var(--muted)); margin-bottom:1.25rem; }
+
+.col{ max-width: 36rem; }
+.col-wide{ max-width: 42rem; }
+
+.hero h1{ font-family:'Fraunces',serif; font-weight:500; font-size: clamp(2.4rem, 5vw, 3.4rem); line-height: 1.05; letter-spacing:-0.025em; margin: 1rem 0 1.25rem;}
+.hero h1 em{ font-style: italic; color: rgb(var(--accent)); font-weight:500; }
+.hero p.lead{ font-size: 1.1rem; color: rgb(var(--muted)); max-width: 32rem;}
+.byline{ display:flex; gap:1.25rem; align-items:center; font-size:13px; color: rgb(var(--muted)); margin-top: 2.25rem; padding-top:1.5rem; border-top: 1px solid rgb(var(--line)); flex-wrap:wrap;}
+.dot{ width:6px; height:6px; border-radius:50%; background: rgb(var(--accent)); display:inline-block;}
+
+section.chapter{ scroll-margin-top: 4rem; padding: 5rem 0 0; }
+section.chapter h2{ font-family:'Fraunces',serif; font-weight:500; font-size: clamp(1.7rem, 3vw, 2.1rem); letter-spacing:-0.02em; line-height: 1.15; margin: 0.5rem 0 1.5rem; max-width: 32rem;}
+section.chapter h2 em{ font-style: italic; color: rgb(var(--accent)); }
+section.chapter p{ max-width: 36rem; margin: 0 0 1.25rem; }
+section.chapter .small-caps{ display:block; margin-bottom: 0.5rem;}
+
+.surface{
+  max-width: 42rem;
+  border: 1px solid rgb(var(--line));
+  background: rgb(var(--bg));
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin: 2rem 0 2.5rem;
+  position:relative;
+}
+.surface .surface-head{
+  display:flex; justify-content:space-between; align-items:center;
+  font-size: 11.5px; letter-spacing:0.16em; text-transform:uppercase;
+  color: rgb(var(--muted));
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+.surface .surface-head .badge{ font-family: ui-monospace,monospace; letter-spacing:0; text-transform:none; padding: 2px 8px; border-radius: 999px; background: rgb(var(--subtle)); color: rgb(var(--fg)); font-size:11px;}
+
+.under{ background-image: linear-gradient(transparent 62%, rgb(var(--accent) / 0.35) 62%); padding: 0 0.05em;}
+.term{ border-bottom: 1px dotted rgb(var(--muted)); cursor: help;}
+
+.scope-pair{ display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;}
+@media(max-width:580px){ .scope-pair{ grid-template-columns:1fr;}}
+.scope-box{ padding:0.65rem 0.85rem; background: rgb(var(--subtle)); border-radius:6px;}
+.scope-box .small-caps{ margin-bottom:4px;}
+.scope-box.in{ border-left:2px solid rgb(var(--good));}
+.scope-box.out{ border-left:2px solid rgb(var(--bad));}
+
+/* tier widget */
+.tier-bar{ display:flex; gap: 6px; margin-bottom: 1rem;}
+.tier-step{ flex:1; height: 36px; border-radius: 6px; background: rgb(var(--subtle)); border:1px solid rgb(var(--line)); display:flex; align-items:center; justify-content:center; font-family: ui-monospace,monospace; font-size:13px; color: rgb(var(--muted)); cursor:pointer; transition: all .15s; font-weight:500;}
+.tier-step.active{ background: rgb(var(--accent)); color: white; border-color: rgb(var(--accent));}
+.tier-detail{ font-size: 14.5px; padding: 0.8rem 1rem; border-left: 2px solid rgb(var(--accent)); background: rgb(var(--subtle)); border-radius: 0 8px 8px 0; min-height: 5rem;}
+.tier-detail .ex{ display:block; margin-top:0.5rem; color: rgb(var(--muted)); font-size: 13px; font-style: italic;}
+
+/* layer tabs */
+.layer-tabs{ display:grid; grid-template-columns: repeat(3, 1fr); gap:0; margin-bottom: 1rem; border: 1px solid rgb(var(--line)); border-radius: 10px; overflow: hidden;}
+.layer-tab{ padding: 0.7rem 0.5rem; text-align:center; cursor:pointer; font-size: 13px; background: rgb(var(--bg)); border-right:1px solid rgb(var(--line)); transition: background .15s;}
+.layer-tab:last-child{ border-right:none;}
+.layer-tab.active{ background: rgb(var(--accent-soft)); font-weight:500;}
+.layer-tab .num{ font-family:'Fraunces',serif; font-size: 1.4rem; display:block; line-height: 1; color: rgb(var(--accent)); margin-bottom: 4px;}
+.layer-body{ font-size: 14.5px; padding: 0.4rem 0;}
+.layer-body .lbl{ font-size: 11.5px; letter-spacing:0.14em; text-transform:uppercase; color: rgb(var(--muted)); margin-top: 0.7rem; display:block;}
+.layer-body .ex{ color:rgb(var(--muted)); font-style:italic; }
+
+/* conflict cards */
+.conflict-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 1rem;}
+@media(max-width: 580px){ .conflict-grid{ grid-template-columns: 1fr;}}
+.cclass{ padding: 10px 12px; border:1px solid rgb(var(--line)); border-radius:8px; cursor:pointer; transition: all .15s; background: rgb(var(--bg)); font-size: 13px;}
+.cclass:hover{ border-color: rgb(var(--accent) / 0.6);}
+.cclass.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent));}
+.cclass code{ font-family: ui-monospace,monospace; font-size: 12px; font-weight: 600; display:block; margin-bottom:2px;}
+.conflict-detail{ font-size: 14.5px; padding: 1rem 1.1rem; background: rgb(var(--subtle)); border-radius: 8px; border-left: 2px solid rgb(var(--accent)); min-height: 5rem;}
+.conflict-detail .ex{ display:block; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed rgb(var(--line)); color: rgb(var(--muted)); font-size: 13px;}
+.conflict-detail .ex .lbl{ color: rgb(var(--fg)); font-weight:500;}
+
+/* stepper */
+.step{ display:flex; gap: 0.9rem; padding: 0.75rem 0.2rem; border-bottom: 1px solid rgb(var(--line)); cursor:pointer; transition: background .15s; align-items:flex-start;}
+.step:last-child{ border-bottom:none;}
+.step:hover{ background: rgb(var(--subtle));}
+.step .stepnum{ flex-shrink:0; width: 24px; height:24px; border-radius:50%; background: rgb(var(--subtle)); display:flex; align-items:center; justify-content:center; font-family: ui-monospace,monospace; font-size: 12px; font-weight:600; color: rgb(var(--muted)); border:1px solid rgb(var(--line)); transition: all .2s;}
+.step.done .stepnum{ background: rgb(var(--accent)); border-color: rgb(var(--accent)); color: white;}
+.step .stepbody{ flex:1;}
+.step .steptitle{ font-weight:500; font-size: 14px;}
+.step .stepdesc{ font-size: 13px; color: rgb(var(--muted)); margin-top: 2px;}
+.step-meta{ display:flex; justify-content:space-between; align-items:center; margin-top: 1rem; font-size: 13px; color: rgb(var(--muted)); gap: 1rem;}
+.btn{ font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); cursor:pointer; color: rgb(var(--fg)); font-family: inherit;}
+.btn:hover{ border-color: rgb(var(--accent));}
+.ok{ color: rgb(var(--good)); font-weight:600;}
+
+/* metrics grid */
+.metric-grid{ display:grid; grid-template-columns: repeat(2, 1fr); gap: 8px;}
+@media(max-width:580px){ .metric-grid{ grid-template-columns: 1fr;}}
+.metric{ padding: 0.85rem 1rem; border:1px solid rgb(var(--line)); border-radius:10px; cursor:pointer; transition: all .15s; background: rgb(var(--bg));}
+.metric:hover{ border-color: rgb(var(--accent) / 0.5);}
+.metric.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent));}
+.metric .mname{ font-family:'Fraunces',serif; font-size: 1.05rem; letter-spacing:-0.01em;}
+.metric .mtag{ font-size: 11px; letter-spacing:0.14em; text-transform:uppercase; color: rgb(var(--muted)); display:block; margin-top:2px;}
+.metric-detail{ margin-top: 1rem; padding: 1.1rem; background: rgb(var(--subtle)); border-radius: 10px; border-left: 2px solid rgb(var(--accent));}
+.metric-detail .mtitle{ font-family:'Fraunces',serif; font-size:1.2rem; letter-spacing:-0.01em; display:flex; align-items:center; gap:0.7rem; flex-wrap:wrap;}
+.metric-detail .mbody{ margin-top:0.4rem; font-size:14.5px;}
+.metric-detail .formula{ font-family: ui-monospace,monospace; font-size: 13px; padding: 0.55rem 0.8rem; background: rgb(var(--bg)); border-radius: 6px; border: 1px solid rgb(var(--line)); margin: 0.7rem 0; display:inline-block;}
+.metric-detail .why{ font-size: 14px; margin-top: 0.4rem;}
+.metric-detail .why .lbl{ font-size: 11px; letter-spacing:0.14em; text-transform:uppercase; color: rgb(var(--muted)); margin-right: 0.5rem;}
+
+/* scorer pill on metric title */
+.m-scorer-pill{ font-family: ui-monospace,monospace; font-size:11px; letter-spacing:0.04em; padding:2px 8px; border-radius:999px; background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); color: rgb(var(--muted)); text-transform:uppercase;}
+.m-scorer-pill.judged{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent)); color: rgb(var(--fg));}
+
+/* gold-set example block inside metric-detail */
+.m-examples-wrap{ display:flex; flex-direction:column; gap:0.7rem; margin-top: 1rem;}
+.m-example{ padding: 0.9rem 1rem; background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); border-radius: 8px;}
+.m-example-head{ display:flex; justify-content:space-between; align-items:baseline; gap:0.6rem; margin-bottom: 0.45rem;}
+.m-example-head .lbl{ font-size: 11px; letter-spacing:0.14em; text-transform:uppercase; color: rgb(var(--muted));}
+.m-example-head .lbl .ex-num{ font-family: ui-monospace,monospace; color: rgb(var(--accent)); margin-left: 0.35rem;}
+.m-example-qid{ font-family: ui-monospace,monospace; font-size:11px; color: rgb(var(--muted));}
+.m-example-q{ font-size:14px; font-weight:500; margin-bottom: 0.5rem; line-height:1.5;}
+.m-example-required{ display:flex; gap:0.55rem; align-items:baseline; flex-wrap:wrap; margin-bottom: 0.55rem;}
+.m-example-required .lbl{ font-size: 10.5px; letter-spacing:0.14em; text-transform:uppercase; color: rgb(var(--muted));}
+.m-example-required .mono{ font-family: ui-monospace,monospace; font-size:12.5px; color: rgb(var(--fg));}
+.m-example-body{ font-size: 13.5px; color: rgb(var(--fg)); line-height: 1.55;}
+.m-example-body .ex-row{ display:grid; grid-template-columns: 4.5rem 1fr auto; gap: 0.6rem; padding: 0.35rem 0; border-bottom: 1px dashed rgb(var(--line));}
+.m-example-body .ex-row:last-child{ border-bottom:none;}
+.m-example-body .ex-arm{ font-weight:600; font-family: ui-monospace,monospace; font-size:12px;}
+.m-example-body .ex-verdict{ font-family: ui-monospace,monospace; font-size:11px; padding: 1px 7px; border-radius: 999px; align-self:start;}
+.m-example-body .ex-verdict.pass{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.m-example-body .ex-verdict.fail{ background: rgb(var(--bad-soft)); color: rgb(var(--bad));}
+.m-example-body .ex-verdict.partial{ background: rgb(var(--accent-soft)); color: rgb(var(--fg));}
+
+/* per-arm score table inside metric-detail */
+.m-scores{ margin-top: 1rem;}
+.m-scores-head{ margin-bottom: 0.45rem;}
+.m-scores-head .lbl{ font-size: 11px; letter-spacing:0.14em; text-transform:uppercase; color: rgb(var(--muted));}
+.m-scores-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px;}
+@media(max-width:680px){ .m-scores-grid{ grid-template-columns: 1fr;}}
+.m-score-card{ padding: 0.85rem 0.95rem; background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); border-radius: 8px;}
+.m-score-card.lead{ border-left: 2px solid rgb(var(--good));}
+.m-score-card.lag{ border-left: 2px solid rgb(var(--bad));}
+.m-score-card.mid{ border-left: 2px solid rgb(var(--line));}
+.m-score-arm{ font-family: ui-monospace,monospace; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color: rgb(var(--muted)); margin-bottom: 0.25rem;}
+.m-score-val{ font-family:'Fraunces',serif; font-size:1.5rem; font-weight:500; letter-spacing:-0.01em; margin-bottom: 0.35rem;}
+.m-score-meaning{ font-size: 12.5px; line-height: 1.5; color: rgb(var(--fg));}
+
+/* judge demo */
+.judge .row{ display:flex; justify-content:space-between; align-items:center; padding: 0.55rem 0.8rem; background: rgb(var(--subtle)); border-radius: 7px; font-size: 14px; margin-bottom: 0.5rem;}
+.judge .row .nm{ font-weight:500;}
+.judge .row .sc{ font-family: ui-monospace,monospace; font-size: 13px;}
+.judge .stars{ color: rgb(var(--accent)); letter-spacing:1px;}
+.judge .stars-empty{ opacity:.25;}
+.judge .bool-true{ color: rgb(var(--good)); font-weight:600;}
+
+/* capstone */
+.cap-q{ padding: 0.8rem 1rem; border: 1px solid rgb(var(--line)); border-radius:8px; background: rgb(var(--bg)); cursor:pointer; transition: all .15s; margin-bottom: 0.5rem; font-size: 14px;}
+.cap-q:hover{ border-color: rgb(var(--accent) / 0.6); }
+.cap-q.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent)); }
+.cap-q .cid{ font-family: ui-monospace,monospace; font-size: 11.5px; color: rgb(var(--muted)); display:block; margin-bottom:3px;}
+.cap-defense{ margin-top: 1.25rem;}
+.cap-defense .row{ display:grid; grid-template-columns: 130px 1fr; gap: 1rem; padding: 0.7rem 0; border-bottom: 1px dashed rgb(var(--line)); font-size: 14px;}
+.cap-defense .row:last-child{ border-bottom:none;}
+.cap-defense .row .lbl{ font-size: 11.5px; letter-spacing:0.14em; text-transform:uppercase; color: rgb(var(--muted));}
+.cap-defense .row .quote{ font-style: italic; color: rgb(var(--muted)); display:block; margin-top:3px; font-size: 13.5px;}
+@media(max-width: 580px){ .cap-defense .row{ grid-template-columns: 1fr; gap: 0.2rem;}}
+
+.fade{ opacity:0; transform: translateY(12px); transition: opacity .7s ease, transform .7s ease;}
+.fade.in{ opacity:1; transform: none;}
+
+footer{ margin-top: 7rem; padding-top: 2rem; border-top: 1px solid rgb(var(--line)); font-size: 13px; color: rgb(var(--muted)); max-width: 42rem;}
+.theme-toggle{ position: fixed; top: 1rem; right: 1rem; width:34px; height:34px; border-radius:50%; border:1px solid rgb(var(--line)); background:rgb(var(--bg)); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; color: rgb(var(--fg)); z-index: 10;}
+
+.pullquote{ font-family:'Fraunces',serif; font-style: italic; font-size: 1.45rem; line-height: 1.4; text-align: center; max-width: 38rem; margin: 4rem auto; padding: 0 2rem; color: rgb(var(--fg));}
+
+/* ---------- exhibits / side-by-side ---------- */
+.exhibit-wrap{ max-width: 64rem; margin: 2rem 0 2.5rem; }
+.exhibit-tabs{ display:flex; gap: 0; border-bottom: 1px solid rgb(var(--line)); margin-bottom: 1.5rem; flex-wrap: wrap;}
+.ex-tab{ padding: 0.65rem 1rem 0.7rem; cursor:pointer; font-size: 12.5px; font-family:'IBM Plex Mono',monospace; letter-spacing:0.05em; color: rgb(var(--muted)); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; user-select:none;}
+.ex-tab:hover{ color: rgb(var(--fg));}
+.ex-tab.active{ color: rgb(var(--accent)); border-bottom-color: rgb(var(--accent)); font-weight:500;}
+.ex-tab .tlvl{ display:inline-block; padding: 1px 6px; background: rgb(var(--subtle)); border-radius: 4px; margin-right: 6px; font-size: 10.5px; color: rgb(var(--muted));}
+.ex-tab.active .tlvl{ background: rgb(var(--accent-soft)); color: rgb(var(--accent));}
+
+.ex-question{ font-family:'Fraunces',serif; font-style: italic; font-size: 1.55rem; line-height: 1.3; color: rgb(var(--fg)); margin: 0 0 1.25rem; max-width: 50rem; letter-spacing:-0.005em;}
+.ex-question::before{ content: "Q · "; font-style: normal; font-family:'IBM Plex Mono',monospace; font-size: 12px; color: rgb(var(--muted)); margin-right: 6px; vertical-align: middle; letter-spacing:0.1em;}
+
+.ex-gold{ border: 1px solid rgb(var(--good)); border-left: 3px solid rgb(var(--good)); background: rgb(var(--good-soft) / 0.35); padding: 1rem 1.15rem; border-radius: 10px; margin-bottom: 1.25rem; position:relative;}
+.ex-gold .gold-label{ font-family:'IBM Plex Mono',monospace; font-size: 10.5px; letter-spacing:0.18em; text-transform:uppercase; color: rgb(var(--good)); font-weight:600; margin-bottom: 0.5rem;}
+.ex-gold .gold-body{ font-size: 14.5px; line-height: 1.55;}
+.ex-gold .gold-cite{ display:inline-flex; align-items:center; gap:5px; margin-top: 0.5rem; padding: 3px 9px; background: rgb(var(--bg)); border: 1px solid rgb(var(--good)); border-radius: 999px; font-family:'IBM Plex Mono',monospace; font-size: 11.5px; color: rgb(var(--good)); font-weight:500;}
+
+.ex-grid{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media(max-width: 880px){ .ex-grid{ grid-template-columns: 1fr; }}
+
+.arm-card{ border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); border-radius: 12px; overflow: hidden; display:flex; flex-direction: column;}
+.arm-card.arm-A{ border-color: rgb(var(--good) / 0.5);}
+.arm-card.arm-C{ border-color: rgb(var(--accent) / 0.4);}
+.arm-card.arm-D{ border-color: rgb(var(--bad) / 0.4);}
+
+.arm-head{ padding: 0.7rem 0.9rem; border-bottom: 1px solid rgb(var(--line)); display:flex; justify-content: space-between; align-items: flex-start; gap: 0.6rem;}
+.arm-card.arm-A .arm-head{ background: rgb(var(--good-soft) / 0.45);}
+.arm-card.arm-C .arm-head{ background: rgb(var(--accent-soft) / 0.35);}
+.arm-card.arm-D .arm-head{ background: rgb(var(--bad-soft) / 0.45);}
+
+.arm-name{ font-family:'IBM Plex Mono',monospace; font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; color: rgb(var(--fg));}
+.arm-sub{ font-size: 11.5px; color: rgb(var(--muted)); margin-top: 1px;}
+.arm-drift{ font-family:'IBM Plex Mono',monospace; font-size: 10.5px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; align-self: flex-start;}
+.arm-drift.low{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.arm-drift.mid{ background: rgb(var(--accent-soft)); color: rgb(var(--accent));}
+.arm-drift.high{ background: rgb(var(--bad-soft)); color: rgb(var(--bad));}
+
+.arm-body{ padding: 0.85rem 0.9rem; font-size: 13.5px; line-height: 1.55; flex: 1; color: rgb(var(--fg));}
+.arm-body .match{ background: rgb(var(--good-soft)); border-bottom: 1px solid rgb(var(--good) / 0.55); padding: 0 2px; border-radius: 2px;}
+.arm-body .miss{ background: rgb(var(--bad-soft)); color: rgb(var(--bad)); text-decoration: line-through; text-decoration-color: rgb(var(--bad) / 0.6); padding: 0 2px; border-radius: 2px;}
+.arm-body .note{ display:block; margin-top: 0.4rem; font-size: 12px; font-style: italic; color: rgb(var(--muted)); padding-left: 10px; border-left: 2px solid rgb(var(--line));}
+.arm-body strong{ font-weight: 600;}
+.arm-projected{ font-size: 10.5px; font-family:'IBM Plex Mono', monospace; color: rgb(var(--muted)); margin-bottom: 0.5rem; letter-spacing:0.08em; text-transform:uppercase;}
+
+.arm-cites{ padding: 0 0.9rem 0.6rem; display:flex; flex-wrap: wrap; gap: 4px; min-height: 1.5rem;}
+.cite-pill{ font-family:'IBM Plex Mono',monospace; font-size: 10.5px; padding: 2px 7px; border-radius: 999px; display:inline-flex; align-items: center; gap: 4px;}
+.cite-pill.hit{ background: rgb(var(--good-soft)); color: rgb(var(--good)); border: 1px solid rgb(var(--good) / 0.35);}
+.cite-pill.miss{ background: rgb(var(--bad-soft)); color: rgb(var(--bad)); border: 1px solid rgb(var(--bad) / 0.35);}
+.cite-pill.none{ background: rgb(var(--subtle)); color: rgb(var(--muted)); border: 1px solid rgb(var(--line)); font-style: italic;}
+
+.arm-foot{ padding: 0.6rem 0.9rem; background: rgb(var(--subtle) / 0.5); border-top: 1px solid rgb(var(--line)); display:flex; gap: 6px; flex-wrap: wrap;}
+.score{ font-family:'IBM Plex Mono',monospace; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); display:flex; align-items: center; gap: 4px; color: rgb(var(--muted));}
+.score .v{ color: rgb(var(--fg)); font-weight: 600;}
+.score.s-good .v{ color: rgb(var(--good));}
+.score.s-bad .v{ color: rgb(var(--bad));}
+.score.s-mid .v{ color: rgb(var(--accent));}
+
+.verdict-bar{ margin-top: 1.25rem; padding: 0.9rem 1.1rem; background: rgb(var(--subtle)); border-left: 3px solid rgb(var(--accent)); border-radius: 0 8px 8px 0; font-size: 14px; line-height: 1.5;}
+.verdict-bar .vlabel{ font-family: ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.15em; text-transform: uppercase; color: rgb(var(--accent)); margin-right: 0.5rem; font-weight: 600;}
+
+/* evidence trace, what each arm SAW */
+.evidence{ padding: 0.5rem 0.9rem; border-top: 1px dashed rgb(var(--line)); display:flex; flex-wrap:wrap; gap:5px; align-items:center; font-size:11px;}
+.evidence .ev-lbl{ font-size:9.5px; letter-spacing:0.18em; text-transform:uppercase; color:rgb(var(--muted)); font-weight:500; margin-right: 3px;}
+.ev-chip{ font-family: ui-monospace, monospace; font-size: 10.5px; padding: 1.5px 6px; border-radius: 4px; background: rgb(var(--subtle)); border: 1px solid rgb(var(--line)); display:inline-flex; align-items:center; gap:3px; color: rgb(var(--fg));}
+.ev-chip.chunk{ background: rgb(var(--bg));}
+.ev-chip.kg{ background: rgb(var(--good-soft)); border-color: rgb(var(--good) / 0.45); color: rgb(var(--good)); font-weight:500;}
+.ev-chip.entity{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent) / 0.45); color: rgb(var(--accent)); font-weight:500;}
+.ev-chip.none{ background: transparent; color: rgb(var(--muted)); font-style: italic; border-style: dashed;}
+.ev-arrow{ color: rgb(var(--muted)); font-family: ui-monospace, monospace; font-size: 10.5px; padding: 0 1px;}
+
+/* KG advantage callout */
+.kg-edge{ margin-top: 1.25rem; padding: 1rem 1.15rem; border: 1px solid rgb(var(--accent) / 0.45); border-left: 3px solid rgb(var(--accent)); background: rgb(var(--accent-soft) / 0.3); border-radius: 10px;}
+.kg-edge-head{ display:flex; align-items:center; gap:8px; font-family:'Inter',sans-serif; font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: rgb(var(--accent)); font-weight: 600; margin-bottom: 0.6rem;}
+.kge-icon{ color: rgb(var(--accent)); font-size: 14px;}
+.kg-edge-body{ font-size: 14px; line-height: 1.55;}
+.kg-edge-body strong{ font-weight:600; color: rgb(var(--fg));}
+.kg-edge-body code{ font-family: ui-monospace, monospace; font-size: 12.5px; padding: 1px 5px; background: rgb(var(--bg)); border-radius: 4px; border: 1px solid rgb(var(--line) / 0.7);}
+
+.section-wide{ max-width: 64rem;}
+
+/* ============ ANGLES (Section 10) ============ */
+.angle-card{ max-width: 46rem; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); border-radius: 14px; padding: 1.5rem; margin: 1.5rem 0 1.5rem;}
+.angle-head{ display:flex; align-items:flex-start; gap:0.8rem; margin-bottom: 1.25rem;}
+.ang-num{ width: 26px; height:26px; border-radius:50%; background: rgb(var(--accent)); color: white; display:flex; align-items:center; justify-content:center; font-family:'Inter',sans-serif; font-size: 12px; font-weight:600; flex-shrink:0; margin-top: 2px;}
+.ang-title{ font-size: 1.15rem; font-weight:500; line-height: 1.2;}
+.ang-sub{ font-size: 13px; color: rgb(var(--muted)); margin-top: 2px;}
+.angle-note{ margin-top: 1.1rem; font-size: 13.5px; color: rgb(var(--muted)); line-height: 1.55; padding: 0.7rem 0.95rem; background: rgb(var(--subtle)); border-radius: 8px; border-left: 2px solid rgb(var(--line));}
+.angle-note strong{ color: rgb(var(--fg)); font-weight: 500;}
+
+/* arm color tokens for re-use */
+.arm-A{ --c: var(--good); --csoft: var(--good-soft);}
+.arm-C{ --c: var(--accent); --csoft: var(--accent-soft);}
+.arm-D{ --c: var(--bad); --csoft: var(--bad-soft);}
+
+/* --- Pipeline --- */
+.pipe-card{ max-width: 56rem;}
+.pipe-arms{ display:flex; gap: 6px; margin-bottom: 1.25rem; flex-wrap: wrap;}
+.parm{ font-family:'Inter',sans-serif; font-size: 12px; padding: 6px 12px; border-radius: 999px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); cursor:pointer; color: rgb(var(--muted)); transition: all .15s;}
+.parm:hover{ color: rgb(var(--fg));}
+.parm.active{ background: rgb(var(--csoft)); border-color: rgb(var(--c)); color: rgb(var(--c)); font-weight: 500;}
+.pipeline{ display:flex; align-items: stretch; gap: 0; flex-wrap: nowrap; padding: 0.25rem 0; width: 100%;}
+.pstep{ flex: 1 1 0; min-width: 0; padding: 0.55rem 0.4rem; text-align: center; border: 1px solid rgb(var(--line)); border-radius: 8px; background: rgb(var(--bg)); transition: all 0.45s ease; opacity: 0.4; cursor: pointer; position: relative;}
+.pstep:hover{ opacity: 1; border-color: rgb(var(--accent));}
+.pstep.on{ background: rgb(var(--csoft, var(--accent-soft))); border-color: rgb(var(--c, var(--accent))); opacity: 1; transform: translateY(-2px); box-shadow: 0 2px 6px rgb(var(--c, var(--accent)) / 0.18);}
+.pstep.selected{ outline: 2px solid rgb(var(--accent)); outline-offset: 2px; opacity: 1;}
+.pstep .sel-dot{ position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--accent)); display: none;}
+.pstep.selected .sel-dot{ display: block;}
+.ps-name{ font-family: 'Fraunces', serif; font-size: 0.92rem; font-weight: 500; line-height:1.05;}
+.ps-meta{ font-family: ui-monospace, monospace; font-size: 9.5px; color: rgb(var(--muted)); margin-top: 2px; line-height:1.15;}
+.pstep.on .ps-meta{ color: rgb(var(--c, var(--accent)));}
+.pgap{ flex: 0 0 10px; align-self: center; height: 1px; background: rgb(var(--line)); position: relative;}
+.pgap::after{ content: "→"; position: absolute; top: -7px; left: 50%; transform: translateX(-50%); font-family: ui-monospace, monospace; font-size: 10px; color: rgb(var(--muted)); background: rgb(var(--bg)); padding: 0 2px;}
+.pgap.on{ background: rgb(var(--c, var(--accent)));}
+.pgap.on::after{ color: rgb(var(--c, var(--accent)));}
+
+.pipe-summary{ margin-top: 1.1rem;}
+
+/* --- step detail panel --- */
+.step-detail{ margin-top: 1.5rem; border-top: 1px solid rgb(var(--line)); padding-top: 1.5rem;}
+.sd-empty{ font-size: 13.5px; color: rgb(var(--muted)); font-style: italic; padding: 1.5rem 0; text-align: center; border: 1px dashed rgb(var(--line)); border-radius: 10px;}
+.sd-card{ background: rgb(var(--subtle) / 0.6); border-radius: 12px; padding: 1.25rem 1.35rem;}
+.sd-head{ display:flex; align-items:flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem;}
+.sd-title{ font-family:'Fraunces', serif; font-size: 1.5rem; font-weight: 500; letter-spacing: -0.01em; line-height: 1.1;}
+.sd-tagline{ font-size: 13px; color: rgb(var(--muted)); margin-top: 3px;}
+.sd-step-no{ font-family: ui-monospace, monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(var(--accent)); padding: 4px 10px; border-radius: 999px; background: rgb(var(--accent-soft)); flex-shrink: 0; white-space: nowrap;}
+.sd-body{ font-size: 14.5px; line-height: 1.6; margin-bottom: 1.25rem;}
+.sd-section{ margin-bottom: 1.1rem;}
+.sd-section:last-child{ margin-bottom: 0;}
+.sd-lbl{ font-family:'Inter',sans-serif; font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: rgb(var(--muted)); font-weight: 600; margin-bottom: 0.55rem;}
+.sd-rows{ display:flex; flex-direction: column; gap: 0.45rem;}
+.sd-row{ display:grid; grid-template-columns: 110px 80px 1fr; gap: 0.8rem; padding: 0.55rem 0.7rem; background: rgb(var(--bg)); border-radius: 7px; font-size: 13.5px; align-items: start;}
+@media (max-width: 580px){ .sd-row{ grid-template-columns: 1fr; gap: 0.3rem;}}
+.sd-row .who{ font-family: ui-monospace, monospace; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; width: fit-content;}
+.sd-row .who.A{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.sd-row .who.B{ background: rgb(var(--accent-soft)); color: rgb(var(--accent));}
+.sd-row .who.D{ background: rgb(var(--bad-soft)); color: rgb(var(--bad));}
+.sd-row .verdict{ font-family: ui-monospace, monospace; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgb(var(--subtle)); color: rgb(var(--muted)); width: fit-content; font-weight: 500;}
+.sd-row .verdict.active{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.sd-row .verdict.skipped{ background: rgb(var(--subtle)); color: rgb(var(--muted));}
+.sd-row .verdict.partial{ background: rgb(var(--accent-soft)); color: rgb(var(--accent));}
+.sd-row .verdict.absent{ background: rgb(var(--bad-soft)); color: rgb(var(--bad));}
+.sd-row .desc{ color: rgb(var(--fg)); line-height: 1.5;}
+.sd-tiers{ display:flex; flex-direction: column; gap: 0.4rem;}
+.sd-tier{ display:grid; grid-template-columns: 130px 1fr; gap: 0.8rem; font-size: 13.5px; padding: 0.4rem 0; border-bottom: 1px dashed rgb(var(--line) / 0.8); align-items: baseline;}
+.sd-tier:last-child{ border-bottom: none;}
+.sd-tier .tg{ font-family: ui-monospace, monospace; font-size: 11px; color: rgb(var(--muted)); font-weight: 500; padding-top: 2px;}
+.sd-examples{ display:flex; flex-direction: column; gap: 0.45rem;}
+.sd-ex{ display:grid; grid-template-columns: 60px 1fr; gap: 0.8rem; padding: 0.5rem 0.7rem; background: rgb(var(--bg)); border-left: 2px solid rgb(var(--accent)); border-radius: 0 6px 6px 0; font-size: 13px; align-items: baseline;}
+.sd-ex .qid{ font-family: ui-monospace, monospace; font-size: 10.5px; color: rgb(var(--accent)); font-weight: 600;}
+.sd-ex .qtext{ line-height: 1.5;}
+.sd-ex code{ font-family: ui-monospace, monospace; font-size: 12px; padding: 1px 5px; background: rgb(var(--subtle)); border-radius: 4px; border: 1px solid rgb(var(--line) / 0.7);}
+.pullquote::before{ content: "“"; display:block; font-size: 3rem; line-height: 0.5; margin-bottom: 1rem; color: rgb(var(--accent));}
+
+/* ============ side-by-side comparison table (Section 4) ============ */
+.cmp-wrap{ max-width: 56rem; margin: 2.5rem 0 1rem; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); border-radius: 14px; overflow: hidden;}
+.cmp-head{ padding: 0.9rem 1.15rem; display:flex; justify-content:space-between; align-items:center; font-size: 11.5px; letter-spacing:0.16em; text-transform:uppercase; color: rgb(var(--muted)); border-bottom: 1px solid rgb(var(--line));}
+.cmp-head .cmp-badge{ font-family: ui-monospace,monospace; letter-spacing:0; text-transform:none; padding: 2px 8px; border-radius: 999px; background: rgb(var(--subtle)); color: rgb(var(--fg)); font-size:11px;}
+.cmp-grid{ display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); }
+.cmp-grid > div{ padding: 0.7rem 1rem; border-bottom: 1px solid rgb(var(--line)); font-size: 13.5px;}
+.cmp-grid > div:nth-child(-n+4){ background: rgb(var(--subtle)); font-size: 11px; letter-spacing:0.14em; text-transform:uppercase; color: rgb(var(--muted)); font-weight: 500;}
+.cmp-grid > div:nth-child(4n+1):not(:first-child){ font-weight: 500;}
+.cmp-row{ display: contents; cursor: pointer;}
+.cmp-row > .c-metric{ display:flex; align-items:center; gap: 0.6rem; font-weight: 500;}
+.cmp-row > .c-metric .caret{ font-family: ui-monospace,monospace; font-size: 10px; color: rgb(var(--muted)); transition: transform .2s; display:inline-block;}
+.cmp-row.open > .c-metric .caret{ transform: rotate(90deg); color: rgb(var(--accent));}
+.cmp-row:hover > div{ background: rgb(var(--accent-soft) / 0.25);}
+.cmp-row > .c-val{ font-family: ui-monospace,monospace; font-size: 13px; font-variant-numeric: tabular-nums; color: rgb(var(--fg));}
+.cmp-row > .c-val.lead{ color: rgb(var(--good)); font-weight: 600;}
+.cmp-row > .c-val.lag{ color: rgb(var(--bad));}
+.cmp-row > .c-val .delta{ font-size: 10.5px; color: rgb(var(--muted)); margin-left: 4px;}
+.c-val .cmp-asterisk{ color: rgb(var(--accent)); font-weight: 700; margin-left: 2px; cursor: help;}
+
+.cmp-expand{ display: none; grid-column: 1 / -1; padding: 1rem 1.2rem 1.2rem; background: rgb(var(--subtle) / 0.5); border-bottom: 1px solid rgb(var(--line)); border-left: 2px solid rgb(var(--accent)); }
+.cmp-expand.show{ display: block;}
+.cmp-expand-head{ font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--muted)); margin-bottom: 0.5rem;}
+.cmp-lvl-grid{ display: grid; grid-template-columns: 60px repeat(3, 1fr); gap: 4px; font-family: ui-monospace,monospace; font-size: 12.5px;}
+.cmp-lvl-grid .h{ font-family:'Inter',sans-serif; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(var(--muted)); padding: 0.4rem 0.6rem;}
+.cmp-lvl-grid .lv{ padding: 0.45rem 0.6rem; background: rgb(var(--bg)); border-radius: 4px; color: rgb(var(--muted)); letter-spacing: 0.04em;}
+.cmp-lvl-grid .vv{ padding: 0.45rem 0.6rem; background: rgb(var(--bg)); border-radius: 4px; font-variant-numeric: tabular-nums;}
+.cmp-lvl-grid .vv.lead{ background: rgb(var(--good-soft)); color: rgb(var(--good)); font-weight: 600;}
+.cmp-lvl-grid .vv.lag{ background: rgb(var(--bad-soft) / 0.5); color: rgb(var(--bad));}
+@media (max-width: 580px){
+  .cmp-grid{ grid-template-columns: 1.5fr repeat(3, 1fr); font-size: 12px;}
+  .cmp-lvl-grid{ grid-template-columns: 50px repeat(3, 1fr);}
+}
+
+/* ============ note callout under comparison table (nested disclosure) ============ */
+.note-callout{ max-width: 56rem; margin: 2.5rem 0 1.5rem; border: 1px solid rgb(var(--line)); border-left: 3px solid rgb(var(--accent)); background: rgb(var(--bg)); border-radius: 0 10px 10px 0;}
+.note-summary-toggle{ width: 100%; display:flex; align-items:center; gap: 0.7rem; padding: 0.75rem 1.1rem; background: transparent; border: none; cursor: pointer; text-align: left; font-family:'Inter',sans-serif; color: rgb(var(--fg)); transition: background .15s;}
+.note-summary-toggle:hover{ background: rgb(var(--accent-soft) / 0.25);}
+.note-summary-toggle .asterisk{ font-family: ui-monospace,monospace; color: rgb(var(--accent)); font-size: 14px; font-weight: 700; flex-shrink: 0;}
+.note-summary-toggle .note-title{ flex: 1; font-size: 13.5px; line-height: 1.4; color: rgb(var(--fg));}
+.note-summary-toggle .ncaret{ font-family: ui-monospace,monospace; font-size: 10px; color: rgb(var(--muted)); transition: transform .2s; flex-shrink: 0;}
+.note-callout.show-summary .note-summary-toggle .ncaret{ transform: rotate(90deg); color: rgb(var(--accent));}
+
+.note-body{ display: none; padding: 0 1.1rem 1.1rem 1.1rem; border-top: 1px dashed rgb(var(--line));}
+.note-callout.show-summary .note-body{ display: block;}
+.note-body p{ margin: 0.85rem 0; font-size: 14px; line-height: 1.6;}
+.note-body .stat{ font-family: ui-monospace,monospace; font-size: 12.5px; padding: 1px 6px; background: rgb(var(--subtle)); border-radius: 4px; border: 1px solid rgb(var(--line) / 0.7); color: rgb(var(--fg)); font-weight: 500;}
+
+.note-example-toggle{ margin-top: 0.4rem; display: inline-flex; align-items: center; gap: 0.45rem; padding: 5px 11px; font-family: 'Inter',sans-serif; font-size: 11.5px; letter-spacing: 0.04em; background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); border-radius: 999px; cursor: pointer; color: rgb(var(--fg)); transition: all .15s;}
+.note-example-toggle:hover{ border-color: rgb(var(--accent)); color: rgb(var(--accent));}
+.note-example-toggle .tcaret{ font-family: ui-monospace,monospace; font-size: 10px; color: rgb(var(--muted)); transition: transform .2s;}
+.note-callout.show-example .note-example-toggle .tcaret{ transform: rotate(90deg); color: rgb(var(--accent));}
+
+.note-example{ display: none; margin-top: 1rem; padding: 1rem 1.15rem; background: rgb(var(--subtle) / 0.55); border: 1px solid rgb(var(--line)); border-radius: 8px;}
+.note-callout.show-example .note-example{ display: block;}
+.note-example .ne-qid{ font-family: ui-monospace,monospace; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(var(--muted)); margin-bottom: 0.35rem;}
+.note-example .ne-q{ font-family:'Fraunces',serif; font-style: italic; font-size: 1rem; line-height: 1.45; color: rgb(var(--fg)); margin-bottom: 0.85rem;}
+.note-example .ne-q .pcite{ background: rgb(var(--accent-soft)); padding: 0 4px; border-radius: 3px; font-style: normal; font-family: ui-monospace,monospace; font-size: 12.5px;}
+.note-example .ne-row{ display: grid; grid-template-columns: 70px 1fr; gap: 0.8rem; padding: 0.55rem 0; border-bottom: 1px dashed rgb(var(--line) / 0.6);}
+.note-example .ne-row:last-of-type{ border-bottom: none;}
+.note-example .ne-row .ne-arm{ font-family: ui-monospace,monospace; font-size: 11px; font-weight: 600; padding: 2px 7px; height: fit-content; border-radius: 4px; width: fit-content;}
+.note-example .ne-row .ne-arm.A{ background: rgb(var(--bad-soft)); color: rgb(var(--bad));}
+.note-example .ne-row .ne-arm.C{ background: rgb(var(--bad-soft)); color: rgb(var(--bad));}
+.note-example .ne-row .ne-arm.D{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.note-example .ne-body{ font-size: 13px; line-height: 1.55;}
+.note-example .ne-body .pcite{ background: rgb(var(--accent-soft)); padding: 0 4px; border-radius: 3px; font-family: ui-monospace,monospace; font-size: 12px;}
+.note-example .ne-body .miss{ color: rgb(var(--bad)); font-style: italic;}
+.note-example .ne-verdicts{ display:flex; gap: 5px; flex-wrap: wrap; margin-top: 0.35rem;}
+.note-example .ne-verdicts .v{ font-family: ui-monospace,monospace; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: rgb(var(--subtle)); color: rgb(var(--muted));}
+.note-example .ne-verdicts .v.good{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.note-example .ne-verdicts .v.bad{ background: rgb(var(--bad-soft)); color: rgb(var(--bad));}
+.note-example .ne-takeaway{ margin-top: 0.85rem; padding: 0.65rem 0.9rem; background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); border-radius: 6px; font-size: 12.5px; line-height: 1.55; color: rgb(var(--fg));}
+.note-example .ne-takeaway strong{ font-weight: 600;}
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">◐</button>
+
+<div class="shell">
+  <aside class="toc-wrap">
+    <div class="toc-head">Contents</div>
+    <ul class="toc" id="toc">
+      <li><a href="#premise"><span class="num">01</span><span>The Premise</span></a></li>
+      <li><a href="#gold"><span class="num">02</span><span>The Gold Set</span></a></li>
+      <li><a href="#tiers"><span class="num">03</span><span>Difficulty Levels</span></a></li>
+      <li><a href="#metrics"><span class="num">04</span><span>What We Measure</span></a></li>
+      <li><a href="#defend"><span class="num">05</span><span>Defending an Answer</span></a></li>
+      <li><a href="#exhibits"><span class="num">06</span><span>Three Systems, One Question</span></a></li>
+      <li><a href="#angles"><span class="num">07</span><span>Inside the Answer</span></a></li>
+    </ul>
+  </aside>
+
+  <main>
+    <header class="hero col">
+      <div class="small-caps"><span class="dot"></span>&nbsp;&nbsp;Seattle Regulatory RAG · Methodology</div>
+      <h1 class="serif">Benchmark methodology</h1>
+      <p class="lead">A 120-question evaluation of the Seattle Regulatory RAG system across two regulatory domains, Parking and Fire Code, stratified into six difficulty levels (L1–L6). Each entry is manually verified against the source PDF before scoring.</p>
+      <div class="byline">
+        <span>120 verified questions</span>
+        <span>·</span>
+        <span>2 topics · Parking, Fire Code</span>
+        <span>·</span>
+        <span>6 difficulty levels</span>
+        <span>·</span>
+        <span>3 systems compared</span>
+      </div>
+    </header>
+
+    <section id="premise" class="chapter">
+      <span class="small-caps">01 · The Premise</span>
+      <h2 class="serif">Why this benchmark exists</h2>
+      <p>Eight regulatory bodies govern construction and land use in Seattle: the Washington Administrative Code (WAC), the Revised Code of Washington (RCW), the Seattle Municipal Code (SMC), Director's Rules, IBC-WA, Washington court opinions, Governor's orders, and SPU Design Standards. These bodies cross-reference one another, occasionally contradict one another, and periodically renumber their own sections.</p>
+      <p>In this context a language model can produce a <span class="under">confidently worded answer</span> that cites a provision repealed years earlier. No public benchmark covers Seattle-specific regulatory retrieval. Because the system under evaluation is a customized retrieval-augmented agent over a local corpus, an in-house benchmark is required to assess its factual accuracy, citation fidelity, and refusal behavior against ground truth derived from the original source PDFs.</p>
+      <div class="surface">
+        <div class="surface-head"><span>What the benchmark covers</span><span class="badge">scope</span></div>
+        <div class="scope-pair">
+          <div class="scope-box in">
+            <div class="small-caps">In scope · six measured metrics</div>
+            <ul style="font-size:13.5px; margin:0; padding-left: 1.1rem; line-height:1.55;">
+              <li><strong>M1 · Citation precision</strong>: do the cited sections resolve in the corpus?</li>
+              <li><strong>M2 · Citation recall</strong>: are the gold-required sections actually cited?</li>
+              <li><strong>M3 · Source attribution</strong>: does the prose name the right issuing body (SMC, WAC, RCW, IBC-WA)?</li>
+              <li><strong>Critical hallucination rate</strong>: rows where every cited section fails to resolve.</li>
+              <li><strong>M4 · Correctness</strong> (LLM-judged 0–5): semantic equivalence to the gold answer.</li>
+              <li><strong>Faithfulness</strong> (LLM-judged 0–5): claims supported by the system's own cited sources.</li>
+            </ul>
+          </div>
+          <div class="scope-box out">
+            <div class="small-caps">Out of scope</div>
+            <div style="font-size:13.5px;">User-interface polish, end-to-end latency, conversational follow-up, multi-turn behavior, and any property beyond the truth of the answer and its citations.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gold" class="chapter">
+      <span class="small-caps">02 · The Gold Set</span>
+      <h2 class="serif">How questions are authored</h2>
+      <p>Question authoring follows a two-stage process. A large language model (Gemini 3.1 Pro) is first prompted with a regulatory section and asked to propose candidate questions whose answer is a number, list, or short phrase appearing literally in the text. The model returns each candidate together with a verbatim source quote, the source document, and a page number.</p>
+      <p>A human reviewer then opens the original PDF, navigates to the cited page, and matches the proposed quote against the text character-for-character. A question enters the gold set only when the quote is verbatim and the answer is correctly derived from its surrounding context. The source PDF is the only authority; no question enters the benchmark on the model's word alone.</p>
+
+      <div class="surface">
+        <div class="surface-head"><span>The verification chain</span><span class="badge" id="chainCount">0 / 5 stages</span></div>
+        <div id="chain">
+          <div class="step" data-i="0"><div class="stepnum">1</div><div class="stepbody"><div class="steptitle">Candidate generation (Gemini 3.1 Pro)</div><div class="stepdesc">For each section in the Parking and Fire Code corpora, Gemini 3.1 Pro proposes 3–5 candidate questions whose answer is a literal value or short phrase in the text. The model also returns the quoted source sentence and the page number.</div></div></div>
+          <div class="step" data-i="1"><div class="stepnum">2</div><div class="stepbody"><div class="steptitle">Open the original PDF</div><div class="stepdesc">The reviewer navigates to the cited page in the source document. Paraphrases and database snapshots are not accepted.</div></div></div>
+          <div class="step" data-i="2"><div class="stepnum">3</div><div class="stepbody"><div class="steptitle">Match the quoted sentence verbatim</div><div class="stepdesc">The proposed quote is searched on the cited page. If it is not present verbatim, the candidate is rejected. OCR drift and paraphrase are caught at this step.</div></div></div>
+          <div class="step" data-i="3"><div class="stepnum">4</div><div class="stepbody"><div class="steptitle">Validate the surrounding context</div><div class="stepdesc">The reviewer confirms that the answer follows from the cited sentence and its immediate context, rather than from an adjacent paragraph, header, or misread merged cell.</div></div></div>
+          <div class="step" data-i="4"><div class="stepnum">5</div><div class="stepbody"><div class="steptitle">Record the verbatim quote, document, and page</div><div class="stepdesc">The exact sentence, source document, and page number are recorded against the question. The entry is now admitted to the gold set.</div></div></div>
+        </div>
+        <div class="step-meta">
+          <span id="chainStatus">A question is a <em>candidate</em>, not gold.</span>
+          <button class="btn" id="chainReset">Reset</button>
+        </div>
+      </div>
+
+      <p>Candidates that fail any verification step are reformulated, deferred, or retained as <strong>no-answer adversarial</strong> items. The final gold set contains 60 verified questions per topic, 10 at each of six difficulty levels, yielding 120 entries in total.</p>
+    </section>
+
+    <section id="tiers" class="chapter">
+      <span class="small-caps">03 · Difficulty Levels</span>
+      <h2 class="serif">Six levels, ten questions each per topic</h2>
+      <p>Each question is assigned to one of six difficulty levels, L1 through L6. The set is balanced by construction: 10 questions per level for each of the two topics, yielding 60 questions per topic and 120 entries in total. Reporting is stratified by level so that strong performance on basic lookups does not conceal weak performance on adversarial or cross-agency reasoning.</p>
+
+      <div class="surface">
+        <div class="surface-head"><span>Level selector</span><span class="badge" id="tierBadge">L1</span></div>
+        <div class="tier-bar" id="tierBar">
+          <div class="tier-step active" data-t="1">L1</div>
+          <div class="tier-step" data-t="2">L2</div>
+          <div class="tier-step" data-t="3">L3</div>
+          <div class="tier-step" data-t="4">L4</div>
+          <div class="tier-step" data-t="5">L5</div>
+          <div class="tier-step" data-t="6">L6</div>
+        </div>
+        <div class="tier-detail" id="tierDetail">
+          <div id="tierBody"></div>
+          <span class="ex" id="tierEx"></span>
+        </div>
+      </div>
+
+      <p>A system may legitimately score well at L1 and weaker at L5 or L6. The stratified report makes that gap visible rather than averaging it into a single, less informative number.</p>
+    </section>
+
+    <section id="metrics" class="chapter">
+      <span class="small-caps">04 · What We Measure · Round 2 Results</span>
+      <h2 class="serif">Six metrics across three systems</h2>
+      <p>Six metrics are computed over the 120-question gold set (10 questions per topic per level, totalling 20 per level across Parking and Fire Code) for three systems: <strong>Arm A · KG-RAG (ours)</strong>, <strong>Arm C · Naive RAG</strong> (vector-only retrieval, no graph), and <strong>Arm D · GPT-5.1</strong> (no retrieval). Four metrics are deterministic Python scorers; two are LLM-judged by Claude Opus 4.7 at temperature zero, cross-family from the synthesizer to avoid same-model bias.</p>
+      <p>Select a metric to view its definition, formula, a worked example from the gold set, and the per-system scores from the latest full run.</p>
+
+      <div class="surface">
+        <div class="surface-head"><span>Metrics in scope · Round 2</span><span class="badge" id="mFamily">deterministic</span></div>
+        <div class="metric-grid" id="mgrid">
+          <div class="metric active" data-m="0"><div class="mname">M1 · Citation precision</div><span class="mtag">Python</span></div>
+          <div class="metric" data-m="1"><div class="mname">M2 · Citation recall</div><span class="mtag">Python</span></div>
+          <div class="metric" data-m="2"><div class="mname">M3 · Source attribution</div><span class="mtag">Python</span></div>
+          <div class="metric" data-m="3"><div class="mname">Critical hallucination rate</div><span class="mtag">Python</span></div>
+          <div class="metric" data-m="4"><div class="mname">M4 · Correctness</div><span class="mtag">LLM-judged · 0–5</span></div>
+          <div class="metric" data-m="5"><div class="mname">Faithfulness</div><span class="mtag">LLM-judged · 0–5</span></div>
+        </div>
+        <div class="metric-detail">
+          <div class="mtitle"><span id="mTitle"></span><span class="m-scorer-pill" id="mScorerPill"></span></div>
+          <div class="mbody" id="mBody"></div>
+          <div class="formula" id="mFormula"></div>
+          <div class="why"><span class="lbl">Why it matters</span><span id="mWhy"></span></div>
+
+          <div class="m-examples-wrap" id="mExamples"></div>
+
+          <div class="m-scores">
+            <div class="m-scores-head"><span class="lbl">Scores · Round 2 · n=120 questions</span></div>
+            <div class="m-scores-grid" id="mScoresGrid"></div>
+          </div>
+        </div>
+      </div>
+
+      <p style="margin-top: 3.5rem;">The table below is the master scoreboard for the full 120-question run. Each row is one metric across all three systems; the leader on each row is highlighted. Select any row to expand the L1 through L6 breakdown for that metric.</p>
+
+      <div class="cmp-wrap">
+        <div class="cmp-head"><span>Overall results · full 120-question run</span><span class="cmp-badge">click any row to expand</span></div>
+        <div class="cmp-grid" id="cmpGrid">
+          <div>Metric</div>
+          <div>Arm A · KG-RAG</div>
+          <div>Arm C · Naive RAG</div>
+          <div>Arm D · GPT 5.1</div>
+        </div>
+      </div>
+
+      <div class="note-callout" id="noteCallout">
+        <button class="note-summary-toggle" id="noteToggle" type="button" aria-expanded="false">
+          <span class="asterisk">*</span>
+          <span class="note-title">Why Arm D's M2 and source-attribution scores are partly an artefact of how the gold set is worded</span>
+          <span class="ncaret">▸</span>
+        </button>
+
+        <div class="note-body">
+          <p>114 of 120 gold questions embed a regulatory citation directly in the prompt (for example <em>"Per RCW 36.70A.635(6)(f), what is the maximum..."</em>), and in <span class="stat">77 / 120</span> that embedded citation matches the gold-required section. Arm D's habit of echoing the section identifier back into its answer means it earns <strong>M2</strong> and <strong>M3 (source attribution)</strong> credit even when no retrieval happened and even when the substantive answer is wrong. Of Arm D's <span class="stat">123</span> inline citations that matched a gold section, <span class="stat">75 (61%)</span> were already named in the question text. The two cells marked with <span style="color: rgb(var(--accent)); font-weight:700;">*</span> in the table above are most affected by this artefact.</p>
+
+          <button class="note-example-toggle" id="noteExToggle" type="button" aria-expanded="false"><span class="tcaret">▸</span><span class="ne-label">Show one worked example</span></button>
+
+          <div class="note-example" id="noteExample">
+            <div class="ne-qid">L1-PARK-006 · gold answer = "2" · required section = RCW 36.70A.635(6)(f)</div>
+            <div class="ne-q">Question: Per <span class="pcite">RCW 36.70A.635(6)(f)</span>, what is the maximum number of off-street parking spaces per unit a city may require for middle housing on lots greater than 6,000 square feet?</div>
+
+            <div class="ne-row">
+              <div class="ne-arm A">Arm A</div>
+              <div class="ne-body">
+                "A city may <strong>not require more than two off-street parking spaces per unit</strong>..." Inline citation is <span class="pcite">WAC 365-196-872</span> (an adjacent state guidance section, not the gold-required RCW).
+                <div class="ne-verdicts"><span class="v bad">M2 0 / 1</span><span class="v good">M4 5 / 5</span><span class="v">Faith 2 / 5</span></div>
+              </div>
+            </div>
+            <div class="ne-row">
+              <div class="ne-arm C">Arm C</div>
+              <div class="ne-body">
+                "...<strong>two spaces per unit</strong>, as stated in <span class="pcite">RCW 36.70A.635(6)(f)</span>." Quotes the statute verbatim.
+                <div class="ne-verdicts"><span class="v good">M2 1 / 1</span><span class="v good">M4 5 / 5</span><span class="v">Faith 5 / 5</span></div>
+              </div>
+            </div>
+            <div class="ne-row">
+              <div class="ne-arm D">Arm D</div>
+              <div class="ne-body">
+                "Per <span class="pcite">RCW 36.70A.635(6)(f)</span>... a city may not require more than <span class="miss">1.0 off-street parking space per dwelling unit</span>." Echoes the citation from the prompt and states the wrong number.
+                <div class="ne-verdicts"><span class="v good">M2 1 / 1</span><span class="v bad">M4 0 / 5</span><span class="v">Faith 1 / 5</span></div>
+              </div>
+            </div>
+
+            <div class="ne-takeaway">
+              Arm A produced the <strong>correct answer</strong> (two spaces per unit) but its inline citation was the adjacent WAC guidance section, not the RCW that the gold required. The scorer compares section identifiers, not substantive understanding, so A loses M2 credit. Arm D produced the <strong>wrong answer</strong> (one space instead of two) but copied the gold-required citation verbatim from the question prompt, so it gains M2 credit anyway. On rows like this, M2 is partly measuring whose prose style happens to echo the question's syntax, not whose retrieval found the right provision.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="defend" class="chapter">
+      <span class="small-caps">05 · Defending an Answer</span>
+      <h2 class="serif">The provenance of one entry</h2>
+      <p>Every entry in the gold set is auditable. Five attributes are recorded at verification time: the question's stated intent, the cited authority (section identifier, document, and page), the verbatim source text, the verification record describing how the entry was checked against the source PDF, and a verdict tag that captures its difficulty level and any adversarial framing.</p>
+      <p>An entry can be revised only by producing either (a) a different verbatim quote from the same PDF page, or (b) a later ordinance that amends the cited provision. Reformulation, paraphrase, or expert opinion is not sufficient to overturn an entry.</p>
+      <p>Four representative questions are shown below, drawn from levels L1, L4, L5, and L6 of the Parking benchmark. Select any question to inspect its provenance.</p>
+
+      <div class="surface">
+        <div class="surface-head"><span>Select a question to inspect</span><span class="badge">gold-set provenance</span></div>
+        <div id="capList"></div>
+        <div class="cap-defense">
+          <div class="row"><span class="lbl">1 · Intent</span><span id="capIntent"></span></div>
+          <div class="row"><span class="lbl">2 · Authority</span><span id="capAuth" class="mono"></span></div>
+          <div class="row"><span class="lbl">3 · Source text</span><span><span class="quote" id="capText"></span></span></div>
+          <div class="row"><span class="lbl">4 · Verification</span><span id="capVer"></span></div>
+          <div class="row"><span class="lbl">5 · Verdict</span><code class="mono" id="capVerdict"></code></div>
+        </div>
+      </div>
+
+    </section>
+
+    <section id="exhibits" class="chapter section-wide">
+      <span class="small-caps">06 · Three Systems, One Question</span>
+      <h2 class="serif">Three systems on the same question</h2>
+      <p>To illustrate scoring in practice, the same gold-set question is presented to all three systems and the resulting answers are displayed side by side. Matches against the gold reference are underlined; statements that contradict the gold or its citations are struck through.</p>
+      <p class="muted" style="font-size:13.5px;"><strong>Arm A · KG-RAG</strong> denotes the system under evaluation: hybrid retrieval (vector + BM25), a Kuzu knowledge graph, and a custom regulatory entity recognizer.&nbsp;&nbsp;<strong>Arm C · Naive RAG</strong> is a vector-only baseline with no graph or entity layer.&nbsp;&nbsp;<strong>Arm D · GPT 5.1</strong> is the public model called without retrieval. Each answer below is a verbatim capture from <code class="mono">benchmarks/round_2/runs/full/runs.jsonl</code> on the 120-question run. The score values shown are the metric outputs from the same run.</p>
+
+      <div class="exhibit-wrap">
+        <div class="exhibit-tabs" id="exTabs">
+          <div class="ex-tab active" data-x="0"><span class="tlvl">L1</span>PARK-001 · Dimensional standard</div>
+          <div class="ex-tab" data-x="1"><span class="tlvl">L5</span>PARK-001 · State preemption</div>
+          <div class="ex-tab" data-x="2"><span class="tlvl">L6</span>PARK-001 · False premise</div>
+        </div>
+
+        <p class="ex-question" id="exQuestion"></p>
+
+        <div class="ex-gold">
+          <div class="gold-label">Gold · ground truth</div>
+          <div class="gold-body" id="exGoldBody"></div>
+          <span class="gold-cite" id="exGoldCite"></span>
+        </div>
+
+        <div class="ex-grid" id="exGrid"></div>
+
+        <div class="kg-edge" id="kgEdge">
+          <div class="kg-edge-head"><span class="kge-icon">◆</span><span>What the knowledge graph added on top of Naive RAG</span></div>
+          <div class="kg-edge-body" id="kgEdgeBody"></div>
+        </div>
+
+        <div class="verdict-bar">
+          <span class="vlabel">Verdict</span><span id="exVerdict"></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="angles" class="chapter section-wide">
+      <span class="small-caps">07 · Inside the Answer</span>
+      <h2 class="serif">The retrieval pipeline, step by step</h2>
+      <p>The pipeline comprises seven stages. Each system traverses a different subset of them. Select a system to highlight its path; select any stage to inspect what it does, how it varies per system, and how its behavior shifts with the difficulty level of the question.</p>
+
+      <div class="angle-card pipe-card">
+        <div class="pipe-arms" id="pipeArms">
+          <button class="parm active arm-A" data-arm="A">Arm A · KG-RAG</button>
+          <button class="parm arm-C" data-arm="C">Arm C · Naive RAG</button>
+          <button class="parm arm-D" data-arm="D">Arm D · GPT 5.1</button>
+        </div>
+        <div class="pipeline" id="pipeline">
+          <div class="pstep" data-s="query"><div class="ps-name">Query</div><div class="ps-meta">user text</div></div>
+          <div class="pgap"></div>
+          <div class="pstep" data-s="vector"><div class="ps-name">Vector</div><div class="ps-meta">top-50 chunks</div></div>
+          <div class="pgap"></div>
+          <div class="pstep" data-s="bm25"><div class="ps-name">BM25</div><div class="ps-meta">+top-20 keyword</div></div>
+          <div class="pgap"></div>
+          <div class="pstep" data-s="rerank"><div class="ps-name">Rerank</div><div class="ps-meta">top-5 reranked</div></div>
+          <div class="pgap"></div>
+          <div class="pstep" data-s="graph"><div class="ps-name">Graph</div><div class="ps-meta">+linked nodes</div></div>
+          <div class="pgap"></div>
+          <div class="pstep" data-s="entity"><div class="ps-name">Entity</div><div class="ps-meta">custom regs</div></div>
+          <div class="pgap"></div>
+          <div class="pstep" data-s="llm"><div class="ps-name">LLM</div><div class="ps-meta">cite + answer</div></div>
+        </div>
+        <div class="angle-note pipe-summary" id="pipeNote"></div>
+
+        <div class="step-detail" id="stepDetail">
+          <div class="sd-empty">Tap a step above to see what it does, how it varies per arm, and how it shifts by question type.</div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="rule" />
+
+    <footer>
+      <p><strong>The benchmark is a research instrument, not a marketing artifact.</strong></p>
+      <p>Round 2 results are reported above for the full 120-question gold set across Arms A, C, and D. They are presented exactly as the scoring pipeline returned them, including the metrics where the system under evaluation lags. The point of the benchmark is to surface where the system fails, not to produce a high score. Any gold entry that cannot be defended against the source PDF is rewritten or removed before scoring.</p>
+      <p style="margin-top:1.5rem;" class="small-caps">Seattle Regulatory RAG · Methodology v1 · Round 2 results · 2026</p>
+    </footer>
+  </main>
+</div>
+
+<script>
+// ---------- theme ----------
+function setTheme(t){
+  if(t === 'dark') document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
+  try{ localStorage.setItem('theme', t); }catch(e){}
+}
+document.getElementById('themeBtn').addEventListener('click', () => {
+  setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark');
+});
+(function(){
+  try{
+    const stored = localStorage.getItem('theme');
+    if(stored){ setTheme(stored); }
+    else if(window.matchMedia('(prefers-color-scheme: dark)').matches){ setTheme('dark'); }
+  }catch(e){}
+})();
+
+// ---------- chain stepper ----------
+const chainSteps = document.querySelectorAll('#chain .step');
+const chainCount = document.getElementById('chainCount');
+const chainStatus = document.getElementById('chainStatus');
+const chainDone = new Set();
+function updateChain(){
+  chainCount.textContent = chainDone.size + ' / 5 stages';
+  chainStatus.textContent = '';
+  if(chainDone.size === 5){
+    const tick = document.createElement('span');
+    tick.className = 'ok';
+    tick.textContent = '✓ verified: true';
+    chainStatus.appendChild(tick);
+    chainStatus.appendChild(document.createTextNode('. This entry can now score the system.'));
+  } else if(chainDone.size === 0){
+    chainStatus.appendChild(document.createTextNode('A question is a '));
+    const em = document.createElement('em');
+    em.textContent = 'candidate';
+    chainStatus.appendChild(em);
+    chainStatus.appendChild(document.createTextNode(', not gold.'));
+  } else {
+    const em = document.createElement('em');
+    em.textContent = (5 - chainDone.size) + ' stage(s) remaining';
+    chainStatus.appendChild(em);
+    chainStatus.appendChild(document.createTextNode(' · still a candidate.'));
+  }
+}
+chainSteps.forEach(s => {
+  s.addEventListener('click', () => {
+    const i = +s.dataset.i;
+    if(s.classList.contains('done')){
+      s.classList.remove('done');
+      chainDone.delete(i);
+      s.querySelector('.stepnum').textContent = String(i+1);
+    } else {
+      s.classList.add('done');
+      chainDone.add(i);
+      s.querySelector('.stepnum').textContent = '✓';
+    }
+    updateChain();
+  });
+});
+document.getElementById('chainReset').addEventListener('click', () => {
+  chainSteps.forEach((s,i) => {
+    s.classList.remove('done');
+    s.querySelector('.stepnum').textContent = String(i+1);
+  });
+  chainDone.clear();
+  updateChain();
+});
+
+// ---------- difficulty levels (L1–L6) ----------
+const tierData = [
+  { name:'Single-section literal lookup', body:'A single fact retrieved from one section of one document. Tests basic retrieval and literal extraction.', ex:'L1-PARK-001, "Under SMC 23.54.030, what is the minimum width of a medium vehicle parking space?" Gold answer: 8 feet.' },
+  { name:'Multi-section within one document', body:'The answer requires combining two or more sections from the same source. Tests within-document aggregation and conditional reading.', ex:'L2-PARK-001, "Per RCW 36.70A.535(7), how many distinct exception conditions exempt a city from the co-living parking limits of subsection (3)(a)?" Gold answer: 2.' },
+  { name:'Cross-document, same agency or topic', body:'The answer requires retrieving from two documents in the same agency or topical chain. Tests cross-document retrieval within a single jurisdiction.', ex:'L3-PARK-001, "Per the SPU Development Services Manual (Vol. 18) referencing SMC Chapter 22.805, what is the new-and-replaced impervious surface threshold that triggers on-site stormwater management?"' },
+  { name:'Cross-agency factual reasoning', body:'The answer requires combining facts from different agencies (e.g., state and city) and applying simple arithmetic or conditional logic. Tests jurisdictional joining.', ex:'L4-PARK-001, "A middle-housing project on an 8,000 sq ft lot with 4 units. Per RCW 36.70A.635(6)(f), what is the maximum off-street parking the city may require?" Gold answer: 8 spaces.' },
+  { name:'Cross-agency conflict or preemption', body:'The answer requires surfacing a contradiction, scope gap, or preemption rule between two agencies. The most demanding factual level.', ex:'L5-PARK-001, "Per RCW 36.70A.535(3)(a)(i), what maximum parking may a city require for co-living within one-half mile of a major transit stop?" Gold answer: 0.' },
+  { name:'Adversarial · false premise or no-answer', body:'The question encodes a false premise, an out-of-corpus claim, or a lexical trap. Tests refusal behavior and the system\'s ability to correct rather than accept the framing.', ex:'L6-PARK-001, "Since SMC 23.54.030.L.2.a sets the EV-Ready requirement at 10 percent of spaces, what minimum percentage applies?" The premise is false; the gold answer is 30 percent.' }
+];
+const tierBar = document.getElementById('tierBar');
+const tierBadge = document.getElementById('tierBadge');
+const tierBody = document.getElementById('tierBody');
+const tierEx = document.getElementById('tierEx');
+function showTier(t){
+  tierBar.querySelectorAll('.tier-step').forEach(el => el.classList.toggle('active', +el.dataset.t === t));
+  const d = tierData[t-1];
+  tierBadge.textContent = 'L' + t + ' · ' + d.name;
+  tierBody.textContent = d.body;
+  tierEx.textContent = d.ex;
+}
+tierBar.querySelectorAll('.tier-step').forEach(el => el.addEventListener('click', () => showTier(+el.dataset.t)));
+showTier(1);
+
+// ---------- metrics (Round 2: 6 metrics, real parking gold examples + per-arm scores) ----------
+// Examples are all real captures from benchmarks/round_2/runs/full/runs.jsonl
+// for parking questions. The two LLM-judged metrics carry 2 examples each.
+// All text comes from this static const, DOM nodes are built programmatically.
+const metricData = [
+  {
+    name:'M1 · Citation precision',
+    family:'deterministic',
+    scorer:'Python',
+    formula:'valid_citations / total_citations  (per row, then micro-averaged)',
+    body:'Of the section IDs the answer named, what fraction actually exist in the corpus? Each citation is regex-extracted from the answer, stripped of subsection markers, and looked up in a 113,084-entry index built from every chunk in LanceDB.',
+    why:'A precise citation is the foundation of trust. Fabricated section numbers, "per RCW 36.99.999", are the most dangerous failure mode in regulatory work, because the answer reads authoritative while pointing at thin air.',
+    examples:[
+      {
+        qid:'L3-PARK-001',
+        q:'Per the SPU Development Services Manual (Vol. 18) referencing SMC Chapter 22.805, what is the minimum new-and-replaced impervious surface threshold that triggers on-site stormwater management?',
+        required:'SPU Volume 18 · SMC 22.805.030 · SMC 22.805.050',
+        rows:[
+          { arm:'A', parts:['cites ', {mono:'SMC 22.805.030'}, ', ', {mono:'SMC 22.805.050'}, ', and one neighbour section. All three resolve in the corpus index.'], verdict:'3 / 3 valid', vclass:'pass' },
+          { arm:'C', parts:['cites ', {mono:'SMC 22.805.030'}, ' only. One valid citation.'], verdict:'1 / 1 valid', vclass:'pass' },
+          { arm:'D', parts:['emits ', {mono:'SMC 22.805.'}, ', trailing dot, no section number. Doesn\'t resolve in the index.'], verdict:'0 / 1 valid · flagged', vclass:'fail' },
+        ]
+      }
+    ],
+    scores:[
+      { arm:'Arm A · KG-RAG', value:'99.3%', tier:'lead', meaning:'Out of every 100 citations Arm A names, 99 are real sections in the corpus. Practically zero fabricated references.' },
+      { arm:'Arm C · Naive RAG', value:'80.7%', tier:'lag', meaning:'About 1 in 5 of C\'s canonical citations don\'t resolve. The naive RAG often emits slightly malformed section IDs or refers to non-corpus codes.' },
+      { arm:'Arm D · GPT 5.1', value:'93.0%', tier:'mid', meaning:'GPT 5.1 without retrieval still picks real-looking sections 93% of the time, strong for an ungrounded model, but ~7 in every 100 are pure invention.' },
+    ]
+  },
+  {
+    name:'M2 · Citation recall',
+    family:'deterministic',
+    scorer:'Python',
+    formula:'mean over rows of  |gold ∩ cited| / |gold|  (row-average)',
+    body:'Of the sections the gold said the answer SHOULD include, what fraction did the system actually cite? Both gold and candidate are reduced to section-level keys (subsections stripped) before matching, and "Section X", "Table N", "Chapter Y" gold trailers are folded into their parent section.',
+    why:'High precision and low recall means the answer is correct-but-incomplete. On cross-agency questions, citing only the city code while ignoring the state preemption is a recall failure that can cost a developer a permit.',
+    examples:[
+      {
+        qid:'L3-PARK-001',
+        q:'Per the SPU Development Services Manual (Vol. 18) referencing SMC Chapter 22.805, what is the minimum new-and-replaced impervious surface threshold that triggers on-site stormwater management?',
+        required:'SMC 22.805.030 · SMC 22.805.050 · SPU 18',
+        rows:[
+          { arm:'A', parts:['hits ', {mono:'SMC 22.805.030'}, ' and ', {mono:'SMC 22.805.050'}, ', misses SPU 18.'], verdict:'2 / 3', vclass:'partial' },
+          { arm:'C', parts:['hits only ', {mono:'SMC 22.805.030'}, '. Misses the SPU manual and the second SMC reference.'], verdict:'1 / 3', vclass:'fail' },
+          { arm:'D', parts:['cites ', {mono:'SMC 22.805.'}, ' (malformed), does not resolve to any of the three required sections.'], verdict:'0 / 3', vclass:'fail' },
+        ]
+      }
+    ],
+    scores:[
+      { arm:'Arm A · KG-RAG', value:'64.5%', tier:'mid', meaning:'For every 10 sections the gold demanded, Arm A surfaced about 6.5 of them. Citation set is precise but lean, retrieval picks a top-k window and gold sections outside that window are lost.' },
+      { arm:'Arm C · Naive RAG', value:'33.3%', tier:'lag', meaning:'Misses two-thirds of the gold\'s required sections. C rarely emits canonical citations at all, so there\'s little chance to land on a specific gold section.' },
+      { arm:'Arm D · GPT 5.1', value:'72.1%', tier:'lead', meaning:'Cites verbosely, so when GPT-5.1 knows the topic, the right section usually appears in its output. Wins recall by sheer volume of canonical mentions.' },
+    ]
+  },
+  {
+    name:'M3 · Source attribution',
+    family:'deterministic',
+    scorer:'Python',
+    formula:'matched / checked  (per citation: does the surrounding prose name the right body?)',
+    body:'For each canonical citation in the answer, the scorer checks whether the prose around it names the correct issuing body, SMC, WAC, RCW, IBC-WA, etc. Pure mechanical check via a body-resolver table; no LLM.',
+    why:'A section number alone is ambiguous if the agency is wrong. Saying "per SMC 23.44.014" when the section is actually WAC 51-54A-3307 attributes a state rule to the city, a mistake a real practitioner cannot afford.',
+    examples:[
+      {
+        qid:'L1-PARK-001',
+        q:'Under SMC 23.54.030, what is the minimum width of a "medium vehicle" parking space?',
+        required:'SMC 23.54.030 → prose must name "SMC" or "Seattle Municipal Code"',
+        rows:[
+          { arm:'A', parts:['prose: "Under ', {mono:'SMC 23.54.030.A.2'}, '..." → body recognized as SMC. Match.'], verdict:'matched', vclass:'pass' },
+          { arm:'C', parts:['prose: "...under SMC 23.54.030..." → match.'], verdict:'matched', vclass:'pass' },
+          { arm:'D', parts:['prose: "Under SMC 23.54.030 (Parking space standards)..." → match.'], verdict:'matched', vclass:'pass' },
+        ]
+      }
+    ],
+    scores:[
+      { arm:'Arm A · KG-RAG', value:'52.4%', tier:'lag', meaning:'A and the IBC-WA convention disagree: the scorer expects "IBC-WA" labels around WAC 51-54A citations, but A\'s prose calls them "WAC". Substantively right, label-mismatched.' },
+      { arm:'Arm C · Naive RAG', value:'61.4%', tier:'lead', meaning:'C emits fewer canonical citations, but when it does, the surrounding prose labels them with the right body code more often than not.' },
+      { arm:'Arm D · GPT 5.1', value:'57.0%', tier:'mid', meaning:'GPT-5.1 names the agency correctly more than half the time but mislabels IBC adopted sections as plain WAC.' },
+    ]
+  },
+  {
+    name:'Critical hallucination rate',
+    family:'deterministic',
+    scorer:'Python',
+    formula:'rows where (citations > 0 AND zero valid) / rows where (citations > 0)',
+    body:'A row is "critically hallucinated" when the answer named at least one section AND not a single one resolves to a real provision in the corpus. Refusals (zero citations) are excluded, a careful "I don\'t know" is not a hallucination.',
+    why:'This is the metric that decides whether an answer is safe to act on. A correct but uncited answer is incomplete; an incorrect but uncited answer is wrong; an answer that fabricates every citation is dangerous because the user has no way to verify it.',
+    examples:[
+      {
+        qid:'L3-PARK-001',
+        q:'Per the SPU Development Services Manual (Vol. 18) referencing SMC Chapter 22.805, what is the minimum new-and-replaced impervious surface threshold that triggers on-site stormwater management?',
+        required:'every cited section must resolve in corpus_index (113,084 entries)',
+        rows:[
+          { arm:'A', parts:['three citations, three valid. No flag.'], verdict:'unflagged', vclass:'pass' },
+          { arm:'C', parts:['one citation, valid. No flag.'], verdict:'unflagged', vclass:'pass' },
+          { arm:'D', parts:['only citation is ', {mono:'SMC 22.805.'}, ' (incomplete, no section number after the dot). Zero valid → flagged as a critical hallucination on this row.'], verdict:'flagged', vclass:'fail' },
+        ]
+      }
+    ],
+    scores:[
+      { arm:'Arm A · KG-RAG', value:'0.9%', tier:'lead', meaning:'Less than 1% of rows where Arm A cited sources had every citation be invalid. Practically extinct, the retrieval gate makes fabrication structurally rare.' },
+      { arm:'Arm C · Naive RAG', value:'12.7%', tier:'lag', meaning:'About 1 in 8 of C\'s confidently-cited answers contain only fake or unresolvable section IDs. The most dangerous failure mode in this benchmark.' },
+      { arm:'Arm D · GPT 5.1', value:'5.9%', tier:'mid', meaning:'GPT-5.1 fabricates an entire citation set in roughly 1 of every 17 answers, a meaningful baseline risk for any ungrounded model in a regulatory context.' },
+    ]
+  },
+  {
+    name:'M4 · Correctness',
+    family:'LLM-judged',
+    scorer:'Claude Opus 4.7',
+    formula:'judge.score ∈ {0, 1, 2, 3, 4, 5}  (mean per arm)',
+    body:'Claude Opus 4.7 (cross-family vs the synthesizer to avoid same-model bias) grades the candidate answer against the gold reference and its accepted answer variants. Score 5 = semantically equivalent to gold. Numeric answers must match within standard unit conversions.',
+    why:'Correctness is what an end user actually feels. It is split from faithfulness on purpose: a system can land on the right answer for the wrong reasons (high correctness, low faithfulness) or cite perfectly while drawing the wrong conclusion (low correctness, high faithfulness).',
+    examples:[
+      {
+        qid:'L1-PARK-001',
+        q:'Under SMC 23.54.030, what is the minimum width of a "medium vehicle" parking space?',
+        required:'gold = 8 feet',
+        rows:[
+          { arm:'A', parts:['"a medium vehicle parking space must be at least ', {mono:'8 feet'}, ' in width."'], verdict:'5 / 5', vclass:'pass' },
+          { arm:'C', parts:['"The minimum width... is ', {mono:'8 feet'}, '."'], verdict:'5 / 5', vclass:'pass' },
+          { arm:'D', parts:['"the minimum width for a medium-vehicle parking space is ', {mono:'8 feet 6 inches'}, ' (8.5 feet)." Right citation, wrong number.'], verdict:'0 / 5', vclass:'fail' },
+        ]
+      },
+      {
+        qid:'L2-PARK-004',
+        q:'Per SMC 23.54.030.A.2, what is the minimum required length (in feet) of a medium-vehicle off-street parking space?',
+        required:'gold = 16 feet',
+        rows:[
+          { arm:'A', parts:['"The minimum required length of a medium-vehicle off-street parking space is ', {mono:'16 feet'}, '." Cites ', {mono:'SMC 23.54.030.A.2'}, '.'], verdict:'5 / 5', vclass:'pass' },
+          { arm:'C', parts:['"The minimum required length of a medium-vehicle off-street parking space is ', {mono:'16 feet'}, '." Includes a width/length table.'], verdict:'5 / 5', vclass:'pass' },
+          { arm:'D', parts:['"a medium-vehicle parking space must have a minimum length of ', {mono:'17 feet 6 inches (17.5 feet)'}, '." Cites the exact correct subsection but states the wrong number.'], verdict:'0 / 5', vclass:'fail' },
+        ]
+      }
+    ],
+    scores:[
+      { arm:'Arm A · KG-RAG', value:'4.39 / 5', tier:'lead', meaning:'A near-perfect average. Arm A nails 5/5 on every L1, L3, and L4 bucket; the only weak spot is L6 (false-premise traps) at 2.30/5.' },
+      { arm:'Arm C · Naive RAG', value:'3.96 / 5', tier:'mid', meaning:'Strong overall, slightly behind A. Vector retrieval finds the relevant chunk most of the time; loses ground on multi-hop and conflict questions.' },
+      { arm:'Arm D · GPT 5.1', value:'2.72 / 5', tier:'lag', meaning:'GPT-5.1 alone gets it more than half right but lags retrieval-backed arms by 1.2–1.7 points, the gap is biggest on L4 (cross-agency) where it drops to 2.25/5.' },
+    ]
+  },
+  {
+    name:'Faithfulness',
+    family:'LLM-judged',
+    scorer:'Claude Opus 4.7',
+    formula:'judge.score ∈ {0, 1, 2, 3, 4, 5}  (mean per arm)',
+    body:'Claude Opus 4.7 grades whether every substantive claim in the answer is directly supported by the candidate\'s own cited sources. A claim with no backing citation, or one that contradicts the cited source, costs points.',
+    why:'Faithfulness catches the "right answer for the wrong reason" failure. The user trusts a cited answer because they can verify it. If the citation doesn\'t actually support the claim, the trust collapses on first inspection.',
+    examples:[
+      {
+        qid:'L6-PARK-001',
+        q:'Since SMC 23.54.030.L.2.a sets the EV-Ready requirement for nonresidential parking at 10 percent of spaces, what minimum percentage applies (without exception)?',
+        required:'gold = 30 percent (the premise, 10%, is FALSE)',
+        rows:[
+          { arm:'A', parts:['"The minimum EV-ready requirement... is 30 percent", cites ', {mono:'SMC 23.54.030.L.2.a'}, '. Claim matches the cited section\'s text.'], verdict:'4 / 5', vclass:'partial' },
+          { arm:'C', parts:['states "30%, not 10%", correct correction, but emits no canonical citation to back it.'], verdict:'3 / 5', vclass:'partial' },
+          { arm:'D', parts:['answers "10% of total off-street parking spaces", accepts the false premise. The cited section says 30%, so the claim ', {mono:'contradicts'}, ' its own citation.'], verdict:'1 / 5', vclass:'fail' },
+        ]
+      },
+      {
+        qid:'L3-PARK-001',
+        q:'Per the SPU Development Services Manual (Vol. 18) referencing SMC Chapter 22.805, what triggers on-site stormwater management?',
+        required:'each numeric claim must be supported by a cited section',
+        rows:[
+          { arm:'A', parts:['cites both ', {mono:'SMC 22.805.030'}, ' and ', {mono:'SMC 22.805.050'}, ' alongside the threshold figures. Tight pairing.'], verdict:'5 / 5', vclass:'pass' },
+          { arm:'C', parts:['gives the right threshold but only cites one of the two governing sections. Partial support.'], verdict:'5 / 5', vclass:'pass' },
+          { arm:'D', parts:['cites ', {mono:'SMC 22.805.'}, ' (broken, no section number). The figure has no resolvable backing.'], verdict:'3 / 5', vclass:'partial' },
+        ]
+      }
+    ],
+    scores:[
+      { arm:'Arm A · KG-RAG', value:'4.19 / 5', tier:'lead', meaning:'Most claims are backed by what Arm A cited. The half-point loss comes from over-citing, adding adjacent sections that don\'t support the specific claim, which the judge marks as noise.' },
+      { arm:'Arm C · Naive RAG', value:'4.00 / 5', tier:'mid', meaning:'Comparable to A when C does cite, but it cites less, so fewer claims are explicitly grounded. The score sits right at the pass-but-not-target line.' },
+      { arm:'Arm D · GPT 5.1', value:'3.01 / 5', tier:'lag', meaning:'GPT-5.1\'s answers contain claims that its (sometimes fabricated) citations don\'t actually back. 1.2 points behind retrieval-grounded arms, this is where lack of retrieval hurts most visibly.' },
+    ]
+  },
+];
+const mgrid = document.getElementById('mgrid');
+const mFamily = document.getElementById('mFamily');
+const mTitle = document.getElementById('mTitle');
+const mScorerPill = document.getElementById('mScorerPill');
+const mBody = document.getElementById('mBody');
+const mFormula = document.getElementById('mFormula');
+const mWhy = document.getElementById('mWhy');
+const mExamples = document.getElementById('mExamples');
+const mScoresGrid = document.getElementById('mScoresGrid');
+function _el(tag, cls, text){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function _renderParts(container, parts){
+  // parts: array of strings and {mono:'...'} tokens. Build DOM nodes (no innerHTML).
+  for (const p of parts){
+    if (typeof p === 'string') {
+      container.appendChild(document.createTextNode(p));
+    } else if (p && typeof p === 'object' && p.mono) {
+      container.appendChild(_el('span', 'mono', p.mono));
+    }
+  }
+}
+function _renderExample(ex, total, idx){
+  const box = _el('div', 'm-example');
+  // head
+  const head = _el('div', 'm-example-head');
+  const lbl = _el('span', 'lbl', 'Gold-set example');
+  if (total > 1) {
+    lbl.appendChild(_el('span', 'ex-num', '· ' + (idx + 1) + ' of ' + total));
+  }
+  head.appendChild(lbl);
+  head.appendChild(_el('span', 'm-example-qid', ex.qid));
+  box.appendChild(head);
+  // question
+  box.appendChild(_el('div', 'm-example-q', ex.q));
+  // required
+  const req = _el('div', 'm-example-required');
+  req.appendChild(_el('span', 'lbl', 'Gold requires'));
+  req.appendChild(_el('span', 'mono', ex.required));
+  box.appendChild(req);
+  // body rows
+  const body = _el('div', 'm-example-body');
+  for (const r of ex.rows){
+    const row = _el('div', 'ex-row');
+    row.appendChild(_el('span', 'ex-arm', r.arm));
+    const mid = _el('span');
+    _renderParts(mid, r.parts);
+    row.appendChild(mid);
+    row.appendChild(_el('span', 'ex-verdict ' + r.vclass, r.verdict));
+    body.appendChild(row);
+  }
+  box.appendChild(body);
+  return box;
+}
+function showMetric(i){
+  mgrid.querySelectorAll('.metric').forEach((el,j) => el.classList.toggle('active', j === i));
+  const d = metricData[i];
+  mFamily.textContent = d.family;
+  mTitle.textContent = d.name;
+  mScorerPill.textContent = d.scorer;
+  mScorerPill.className = 'm-scorer-pill' + (d.family === 'LLM-judged' ? ' judged' : '');
+  mBody.textContent = d.body;
+  mFormula.textContent = d.formula;
+  mWhy.textContent = d.why;
+  // Examples (one or two)
+  const examples = d.examples || (d.example ? [d.example] : []);
+  while (mExamples.firstChild) mExamples.removeChild(mExamples.firstChild);
+  examples.forEach((ex, idx) => mExamples.appendChild(_renderExample(ex, examples.length, idx)));
+  // Per-arm score cards
+  while (mScoresGrid.firstChild) mScoresGrid.removeChild(mScoresGrid.firstChild);
+  for (const s of d.scores){
+    const card = _el('div', 'm-score-card ' + s.tier);
+    card.appendChild(_el('div', 'm-score-arm', s.arm));
+    card.appendChild(_el('div', 'm-score-val', s.value));
+    card.appendChild(_el('div', 'm-score-meaning', s.meaning));
+    mScoresGrid.appendChild(card);
+  }
+}
+mgrid.querySelectorAll('.metric').forEach((el,i) => el.addEventListener('click', () => showMetric(i)));
+showMetric(0);
+
+// ---------- side-by-side comparison table (real Round 2 numbers) ----------
+// Source: benchmarks/round_2/runs/full/round2_summary.json
+// Each row: {name, fmt, higher_is_better, overall: {A,C,D}, byLevel: {L1: {A,C,D}, ...}}
+const cmpRows = [
+  {
+    name:'M1 · Citation precision',
+    fmt: v => (v*100).toFixed(1) + '%',
+    higher: true,
+    overall: { A: 0.993, C: 0.807, D: 0.930 },
+    byLevel: {
+      L1: { A: 1.000, C: 0.833, D: 0.950 },
+      L2: { A: 1.000, C: 1.000, D: 0.900 },
+      L3: { A: 1.000, C: 0.800, D: 0.967 },
+      L4: { A: 1.000, C: 0.857, D: 1.000 },
+      L5: { A: 1.000, C: 0.933, D: 0.952 },
+      L6: { A: 0.969, C: 0.529, D: 0.815 }
+    }
+  },
+  {
+    name:'M2 · Citation recall',
+    fmt: v => (v*100).toFixed(1) + '%',
+    higher: true,
+    noteForD: true,
+    overall: { A: 0.645, C: 0.333, D: 0.721 },
+    byLevel: {
+      L1: { A: 0.800, C: 0.450, D: 0.950 },
+      L2: { A: 0.925, C: 0.400, D: 0.875 },
+      L3: { A: 0.558, C: 0.292, D: 0.750 },
+      L4: { A: 0.500, C: 0.225, D: 0.542 },
+      L5: { A: 0.392, C: 0.283, D: 0.400 },
+      L6: { A: 0.706, C: 0.353, D: 0.824 }
+    }
+  },
+  {
+    name:'M3 · Source attribution',
+    fmt: v => (v*100).toFixed(1) + '%',
+    higher: true,
+    noteForD: true,
+    overall: { A: 0.524, C: 0.614, D: 0.570 },
+    byLevel: {
+      L1: { A: 0.500, C: 0.500, D: 0.450 },
+      L2: { A: 0.333, C: 0.700, D: 0.400 },
+      L3: { A: 0.520, C: 0.533, D: 0.633 },
+      L4: { A: 0.308, C: 0.286, D: 0.375 },
+      L5: { A: 0.810, C: 0.733, D: 0.762 },
+      L6: { A: 0.656, C: 0.882, D: 0.741 }
+    }
+  },
+  {
+    name:'Critical hallucination rate',
+    fmt: v => (v*100).toFixed(1) + '%',
+    higher: false,
+    overall: { A: 0.009, C: 0.127, D: 0.059 },
+    byLevel: {
+      L1: { A: 0.000, C: 0.182, D: 0.050 },
+      L2: { A: 0.000, C: 0.000, D: 0.100 },
+      L3: { A: 0.000, C: 0.200, D: 0.050 },
+      L4: { A: 0.000, C: 0.091, D: 0.000 },
+      L5: { A: 0.000, C: 0.077, D: 0.000 },
+      L6: { A: 0.077, C: 0.182, D: 0.150 }
+    }
+  },
+  {
+    name:'M4 · Correctness (0–5)',
+    fmt: v => v.toFixed(2),
+    higher: true,
+    overall: { A: 4.39, C: 3.96, D: 2.72 },
+    byLevel: {
+      L1: { A: 5.00, C: 4.50, D: 3.00 },
+      L2: { A: 4.65, C: 3.85, D: 3.25 },
+      L3: { A: 5.00, C: 4.00, D: 2.75 },
+      L4: { A: 5.00, C: 5.00, D: 2.25 },
+      L5: { A: 4.40, C: 3.60, D: 3.50 },
+      L6: { A: 2.30, C: 2.80, D: 1.55 }
+    }
+  },
+  {
+    name:'Faithfulness (0–5)',
+    fmt: v => v.toFixed(2),
+    higher: true,
+    overall: { A: 4.19, C: 4.00, D: 3.01 },
+    byLevel: {
+      L1: { A: 4.30, C: 4.25, D: 3.30 },
+      L2: { A: 4.40, C: 3.55, D: 3.35 },
+      L3: { A: 4.70, C: 4.55, D: 3.10 },
+      L4: { A: 4.50, C: 4.15, D: 2.70 },
+      L5: { A: 4.40, C: 4.25, D: 3.25 },
+      L6: { A: 2.85, C: 3.25, D: 2.35 }
+    }
+  }
+];
+
+function _classifyArms(vals, higher){
+  const arr = ['A','C','D'].map(a => ({a, v: vals[a]}));
+  const sorted = arr.slice().sort((x,y) => higher ? y.v - x.v : x.v - y.v);
+  const leadArm = sorted[0].a;
+  const lagArm = sorted[2].a;
+  const out = {};
+  arr.forEach(({a}) => {
+    if (a === leadArm) out[a] = 'lead';
+    else if (a === lagArm) out[a] = 'lag';
+    else out[a] = '';
+  });
+  return out;
+}
+
+(function renderCmpTable(){
+  const grid = document.getElementById('cmpGrid');
+  cmpRows.forEach((r, ri) => {
+    const cls = _classifyArms(r.overall, r.higher);
+    // metric cell
+    const m = document.createElement('div');
+    m.className = 'c-metric';
+    const caret = document.createElement('span');
+    caret.className = 'caret';
+    caret.textContent = '▸';
+    m.appendChild(caret);
+    m.appendChild(document.createTextNode(r.name));
+    m.dataset.row = ri;
+    grid.appendChild(m);
+    // arm cells
+    ['A','C','D'].forEach(a => {
+      const c = document.createElement('div');
+      c.className = 'c-val ' + cls[a];
+      c.textContent = r.fmt(r.overall[a]);
+      if (a === 'D' && r.noteForD) {
+        const ast = document.createElement('span');
+        ast.className = 'cmp-asterisk';
+        ast.textContent = ' *';
+        ast.title = 'See note below the table';
+        c.appendChild(ast);
+      }
+      c.dataset.row = ri;
+      grid.appendChild(c);
+    });
+    // expand row container (spans 4 columns)
+    const exp = document.createElement('div');
+    exp.className = 'cmp-expand';
+    exp.dataset.expand = ri;
+    const head = document.createElement('div');
+    head.className = 'cmp-expand-head';
+    head.textContent = r.name + ' · stratified by difficulty level';
+    exp.appendChild(head);
+    const lvl = document.createElement('div');
+    lvl.className = 'cmp-lvl-grid';
+    // header row
+    ['Level','Arm A','Arm C','Arm D'].forEach(h => {
+      const hh = document.createElement('div'); hh.className = 'h'; hh.textContent = h; lvl.appendChild(hh);
+    });
+    // L1..L6 rows
+    ['L1','L2','L3','L4','L5','L6'].forEach(L => {
+      const vals = r.byLevel[L];
+      const subCls = _classifyArms(vals, r.higher);
+      const lcell = document.createElement('div'); lcell.className = 'lv'; lcell.textContent = L; lvl.appendChild(lcell);
+      ['A','C','D'].forEach(a => {
+        const vc = document.createElement('div');
+        vc.className = 'vv ' + subCls[a];
+        vc.textContent = r.fmt(vals[a]);
+        lvl.appendChild(vc);
+      });
+    });
+    exp.appendChild(lvl);
+    grid.appendChild(exp);
+  });
+  // click handlers
+  grid.addEventListener('click', (ev) => {
+    let t = ev.target;
+    while (t && t !== grid && !t.dataset.row) t = t.parentElement;
+    if (!t || !t.dataset.row) return;
+    const ri = t.dataset.row;
+    const exp = grid.querySelector(`[data-expand="${ri}"]`);
+    if (!exp) return;
+    const wasOpen = exp.classList.contains('show');
+    // close any open expand
+    grid.querySelectorAll('.cmp-expand.show').forEach(e => e.classList.remove('show'));
+    grid.querySelectorAll('.c-metric').forEach(e => e.parentElement && e.classList.remove('open'));
+    // also reset open class on row metric
+    grid.querySelectorAll('.c-metric.open').forEach(e => e.classList.remove('open'));
+    if (!wasOpen) {
+      exp.classList.add('show');
+      const metricCell = grid.querySelector(`.c-metric[data-row="${ri}"]`);
+      if (metricCell) metricCell.classList.add('open');
+    }
+  });
+})();
+
+// ---------- note callout: nested disclosure (heading -> summary -> example) ----------
+(function noteToggleSetup(){
+  const wrap = document.getElementById('noteCallout');
+  const headBtn = document.getElementById('noteToggle');
+  const exBtn = document.getElementById('noteExToggle');
+  if (!wrap || !headBtn) return;
+  headBtn.addEventListener('click', () => {
+    const open = wrap.classList.toggle('show-summary');
+    headBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) {
+      // collapsing the summary also collapses the example
+      wrap.classList.remove('show-example');
+      if (exBtn) exBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
+  if (exBtn) {
+    exBtn.addEventListener('click', () => {
+      const open = wrap.classList.toggle('show-example');
+      exBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      exBtn.querySelector('.ne-label').textContent = open ? 'Hide example' : 'Show one worked example';
+    });
+  }
+})();
+
+// ---------- capstone (Round 2 gold-set parking questions) ----------
+const capData = [
+  {
+    id:'L1-PARK-001',
+    q:'Under SMC 23.54.030, what is the minimum width of a "medium vehicle" parking space?',
+    intent:'L1 single-section literal lookup. Tests basic retrieval of a parking dimensional standard.',
+    auth:'SMC 23.54.030.A.2 · SMC Title 23 (Land Use Code) · p. 829',
+    text:'"\'Medium vehicle\' means the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length."',
+    ver:'Section opened in the source PDF; the quoted sentence was matched on p. 829; gold answer (8 feet) and required citation (SMC 23.54.030.A.2) recorded.',
+    verdict:'L1 · single-section literal · gold answer = "8 feet"'
+  },
+  {
+    id:'L4-PARK-001',
+    q:'A middle-housing project sits on an 8,000 sq ft lot with 4 units. Per RCW 36.70A.635(6)(f), what is the maximum total off-street parking the city may require?',
+    intent:'L4 cross-agency factual. A city-level cap constrained by a state preemption clause, plus arithmetic across unit count.',
+    auth:'RCW 36.70A.635(6)(f) · SMC 23.54.015 (Land Use Code parking table) · RCW Title 36 PDF p. 129',
+    text:'RCW 36.70A.635(6)(f): "max 2 spaces per unit on lots greater than 6,000 sq ft." For 4 units, 4 × 2 = 8 spaces.',
+    ver:'Statute opened, subsection (6)(f) verified on p. 129; arithmetic confirmed against gold answer (8).',
+    verdict:'L4 · cross-agency factual · gold answer = "8 spaces"'
+  },
+  {
+    id:'L5-PARK-001',
+    q:'Per RCW 36.70A.535(3)(a)(i), what is the maximum number of off-street parking spaces a city may require for co-living housing within one-half mile of a major transit stop?',
+    intent:'L5 cross-agency preemption. Tests whether the system surfaces a state floor that overrides a city-level requirement.',
+    auth:'RCW 36.70A.535(3)(a)(i) · interacts with SMC 23.54.015 Table B (transit exemption) · RCW Title 36 PDF p. 113',
+    text:'RCW 36.70A.535(3)(a)(i): "may not require co-living housing to: (i) Provide off-street parking within one-half mile walking distance of a major transit stop." Maximum allowed = 0.',
+    ver:'Statute opened on p. 113; subsection (3)(a)(i) matched verbatim; gold answer (0) recorded as the state-imposed cap.',
+    verdict:'L5 · state preemption · gold answer = "0"'
+  },
+  {
+    id:'L6-PARK-001',
+    q:'Since SMC 23.54.030.L.2.a sets the EV-Ready requirement for nonresidential parking at 10 percent of spaces, what minimum percentage applies (without exception)?',
+    intent:'L6 adversarial false-premise. The question encodes a planted figure (10 percent); a correct answer must override the premise and supply the actual figure.',
+    auth:'SMC 23.54.030.L.2.a · SMC Title 23 (Land Use Code) · p. 842',
+    text:'SMC 23.54.030.L.2.a: "a minimum of 30 percent of those spaces shall be EV-ready." The premise of 10 percent is false.',
+    ver:'Section opened on p. 842; the 30 percent figure matched verbatim and recorded; the planted 10 percent traced to an earlier version of the code that has since been amended.',
+    verdict:'L6 · false premise · gold answer = "30 percent" with premise correction'
+  }
+];
+const capList = document.getElementById('capList');
+const capIntent = document.getElementById('capIntent');
+const capAuth = document.getElementById('capAuth');
+const capText = document.getElementById('capText');
+const capVer = document.getElementById('capVer');
+const capVerdict = document.getElementById('capVerdict');
+capData.forEach((d,i) => {
+  const div = document.createElement('div');
+  div.className = 'cap-q' + (i===0 ? ' active' : '');
+  div.dataset.i = i;
+  const cid = document.createElement('span');
+  cid.className = 'cid';
+  cid.textContent = d.id;
+  div.appendChild(cid);
+  div.appendChild(document.createTextNode(d.q));
+  div.addEventListener('click', () => showCap(i));
+  capList.appendChild(div);
+});
+function showCap(i){
+  capList.querySelectorAll('.cap-q').forEach((el,j) => el.classList.toggle('active', j === i));
+  const d = capData[i];
+  capIntent.textContent = d.intent;
+  capAuth.textContent = d.auth;
+  capText.textContent = d.text;
+  capVer.textContent = d.ver;
+  capVerdict.textContent = d.verdict;
+}
+showCap(0);
+
+// ---------- exhibits (Round 2 parking captures) ----------
+// All answer text is verbatim from benchmarks/round_2/runs/full/runs.jsonl
+// Scores are real judge outputs (M4 correctness + faithfulness) on the same run.
+// evidence chip kinds: chunk | kg (graph-linked) | entity (custom regulatory entity) | none
+const exhibits = [
+  {
+    qid:'L1-PARK-001', level:'L1',
+    question:'Under SMC 23.54.030, what is the minimum width of a "medium vehicle" parking space?',
+    gold:{ body:'8 feet. SMC 23.54.030.A.2: "the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length."', cite:'SMC 23.54.030.A.2 · Title 23 - Land Use Code · p. 829' },
+    arms:[
+      { id:'A', name:'Arm A · KG-RAG (ours)', sub:'hybrid + graph + custom entities · Round 2 capture', drift:'low', driftLabel:'exact answer · subsection cited', projected:false,
+        segments:[
+          {k:'plain', t:'Under '},
+          {k:'match', t:'SMC 23.54.030.A.2'},
+          {k:'plain', t:', a "medium vehicle" parking space must be at least '},
+          {k:'match', t:'8 feet in width.'},
+          {k:'note', t:'Subsection-level citation, gold answer matched verbatim, body label "SMC" matches. Hybrid retrieval put SMC 23.54.030 at rank 1; graph expansion added neighbouring Title 11 parking definitions.'}
+        ],
+        evidence:[ {k:'chunk', t:'SMC 23.54.030 (top-1)'}, {k:'chunk', t:'SMC 11.72.070'}, {k:'chunk', t:'SMC 11.60.050'}, {k:'kg', t:'+ medium-vehicle graph neighbours'} ],
+        cites:[ {c:'SMC 23.54.030', kind:'hit'}, {c:'SMC 11.72.070', kind:'miss'} ],
+        scores:[ {k:'M4 · Correct', v:'5/5', tone:'good'}, {k:'Faith', v:'5/5', tone:'good'}, {k:'M1 · Cite', v:'2/2 valid', tone:'good'} ] },
+      { id:'C', name:'Arm C · Naive RAG', sub:'vector-only, no graph · Round 2 capture', drift:'low', driftLabel:'right answer · clean cite', projected:false,
+        segments:[
+          {k:'plain', t:'The minimum width of a "medium vehicle" parking space under SMC 23.54.030 is '},
+          {k:'match', t:'8 feet.'},
+          {k:'note', t:'Right answer, single canonical citation. C\'s table-formatted output is concise; here the canonical SMC ID made it through, which is why M1 fires "1/1 valid" rather than the more common undefined state.'}
+        ],
+        evidence:[ {k:'chunk', t:'SMC 23.54.030 (vector + BM25 fused)'} ],
+        cites:[ {c:'SMC 23.54.030', kind:'hit'} ],
+        scores:[ {k:'M4 · Correct', v:'5/5', tone:'good'}, {k:'Faith', v:'5/5', tone:'good'}, {k:'M1 · Cite', v:'1/1 valid', tone:'good'} ] },
+      { id:'D', name:'Arm D · GPT 5.1', sub:'public model, no retrieval · Round 2 capture', drift:'high', driftLabel:'right citation · wrong number', projected:false,
+        segments:[
+          {k:'plain', t:'Under '},
+          {k:'match', t:'SMC 23.54.030 (Parking space standards)'},
+          {k:'plain', t:', the minimum width for a "medium vehicle" parking space is '},
+          {k:'miss', t:'8 feet 6 inches (8.5 feet).'},
+          {k:'note', t:'Cites the right section but states the wrong number, gold is exactly 8 feet, not 8.5. The cited section\'s actual text says 8 feet, so D contradicts its own citation. Classic ungrounded-LLM failure: authoritative formatting, fails verification.'}
+        ],
+        evidence:[ {k:'none', t:'⊘ no retrieval, answers from training memory only'} ],
+        cites:[ {c:'SMC 23.54.030', kind:'hit'} ],
+        scores:[ {k:'M4 · Correct', v:'0/5', tone:'bad'}, {k:'Faith', v:'1/5', tone:'bad'}, {k:'M1 · Cite', v:'1/1 valid', tone:'good'} ] }
+    ],
+    kgEdge:'Clean L1 lookup. Retrieval-backed arms (A and C) both nail 8 feet; A names the exact subsection (.A.2) thanks to graph expansion of the parking-definitions cluster. Arm D shows the dangerous ungrounded failure mode: cites a real section, then states a wrong figure. M1 still scores D as 1/1 valid because the section it cited does exist, but M4 correctness and faithfulness both fail because the claim contradicts the source.',
+    verdict:'A and C: 5/5 correctness and faithfulness. D cites the right section but states 8.5\' instead of 8\', wrong answer, wrong faithfulness, even though the section ID is real.'
+  },
+  {
+    qid:'L5-PARK-001', level:'L5',
+    question:'Per RCW 36.70A.535(3)(a)(i), what is the maximum number of off-street parking spaces a city may require for co-living housing located within one-half mile walking distance of a major transit stop?',
+    gold:{ body:'0 spaces. RCW 36.70A.535(3)(a)(i): "may not require co-living housing to: (i) Provide off-street parking within one-half mile walking distance of a major transit stop." Maximum allowed = 0.', cite:'RCW 36.70A.535(3)(a)(i) · RCW Title 36 (Growth Management) · p. 113' },
+    arms:[
+      { id:'A', name:'Arm A · KG-RAG (ours)', sub:'hybrid + graph + custom entities · Round 2 capture', drift:'low', driftLabel:'state preemption surfaced cleanly', projected:false,
+        segments:[
+          {k:'plain', t:'The city '},
+          {k:'match', t:'may not require any off-street parking spaces'},
+          {k:'plain', t:' for co-living housing located within '},
+          {k:'match', t:'one-half mile walking distance of a major transit stop. [RCW 36.70A.535(3)(a)(i)]'},
+          {k:'note', t:'Single, precise claim, anchored to the exact subsection that creates the preemption. Graph expansion pulled the co-living definitions chunk alongside the parking exemption, so the answer arrived already grounded in the right statute.'}
+        ],
+        evidence:[ {k:'chunk', t:'RCW 36.70A.535 (top-1)'}, {k:'chunk', t:'RCW 36.70A.620'}, {k:'chunk', t:'RCW 36.70A.630'}, {k:'kg', t:'+ co-living / transit-stop graph neighbours'} ],
+        cites:[ {c:'RCW 36.70A.535(3)(a)(i)', kind:'hit'} ],
+        scores:[ {k:'M4 · Correct', v:'5/5', tone:'good'}, {k:'Faith', v:'5/5', tone:'good'}, {k:'M1 · Cite', v:'1/1 valid', tone:'good'} ] },
+      { id:'C', name:'Arm C · Naive RAG', sub:'vector-only, no graph · Round 2 capture', drift:'mid', driftLabel:'careful refusal · gold answer missed', projected:false,
+        segments:[
+          {k:'miss', t:'"This could not be determined from the available materials."'},
+          {k:'plain', t:' Notes that the retrieved excerpts only describe co-living as a permitted use and do not contain subsection '},
+          {k:'match', t:'(3)(a)(i)'},
+          {k:'plain', t:'. Cites RCW 36.70A.535 generally.'},
+          {k:'note', t:'A safe refusal: faithfulness stays high because the answer makes no unsupported claim, but correctness scores 0 because the gold answer (0 spaces) was not produced. This is the classic vector-only failure on a multi-subsection preemption question, the right chunk is not in the top-k.'}
+        ],
+        evidence:[ {k:'chunk', t:'RCW 36.70A.535 (top-k vector, partial chunk)'} ],
+        cites:[ {c:'RCW 36.70A.535', kind:'hit'} ],
+        scores:[ {k:'M4 · Correct', v:'0/5', tone:'bad'}, {k:'Faith', v:'4/5', tone:'mid'}, {k:'M1 · Cite', v:'1/1 valid', tone:'good'} ] },
+      { id:'D', name:'Arm D · GPT 5.1', sub:'public model, no retrieval · Round 2 capture', drift:'high', driftLabel:'fabricated cap · contradicts cited section', projected:false,
+        segments:[
+          {k:'plain', t:'Under '},
+          {k:'match', t:'RCW 36.70A.535(3)(a)(i)'},
+          {k:'plain', t:', cities cannot require more than '},
+          {k:'miss', t:'0.25 off-street parking spaces per sleeping unit'},
+          {k:'plain', t:' for co-living housing near a major transit stop.'},
+          {k:'note', t:'Invents a specific numeric cap (0.25 per sleeping unit) that does not appear anywhere in the cited subsection. The actual rule prohibits requiring any off-street parking at all, so the claim contradicts the section that D itself names.'}
+        ],
+        evidence:[ {k:'none', t:'no retrieval, statute recalled from training memory'} ],
+        cites:[ {c:'RCW 36.70A.535(3)(a)(i)', kind:'hit'} ],
+        scores:[ {k:'M4 · Correct', v:'0/5', tone:'bad'}, {k:'Faith', v:'1/5', tone:'bad'}, {k:'M1 · Cite', v:'1/1 valid', tone:'good'} ] }
+    ],
+    kgEdge:'L5 state preemption. Only the KG-RAG arm reaches the exact subsection that creates the preemption and produces the gold answer (0). The naive RAG refuses safely (faithful but incorrect), and the ungrounded model fabricates a "0.25 per sleeping unit" cap that contradicts the statute it cites. The diagnostic value of L5 is precisely this: M1 marks every arm as 1/1 valid because the section IDs are real, so the failure is visible only in correctness and faithfulness.',
+    verdict:'A: 5/5 correctness and faithfulness, gold answer reached. C refuses safely (faithfulness 4, correctness 0). D fabricates "0.25 per sleeping unit", a number absent from the cited statute (correctness 0, faithfulness 1).'
+  },
+  {
+    qid:'L6-PARK-001', level:'L6',
+    question:'Since SMC 23.54.030.L.2.a sets the EV-Ready requirement for nonresidential parking at 10 percent of spaces, what minimum percentage applies (without exception)?',
+    gold:{ body:'30 percent. SMC 23.54.030.L.2.a: "a minimum of 30 percent of those spaces shall be EV-ready." The premise (10 percent) is FALSE.', cite:'SMC 23.54.030.L.2.a · Title 23 Land Use Code · p. 842' },
+    arms:[
+      { id:'A', name:'Arm A · KG-RAG (ours)', sub:'hybrid + graph + custom entities · Round 2 capture', drift:'low', driftLabel:'corrected premise · grounded', projected:false,
+        segments:[
+          {k:'plain', t:'The minimum EV-ready requirement for nonresidential parking is '},
+          {k:'match', t:'30 percent of spaces'},
+          {k:'plain', t:', because '},
+          {k:'match', t:'SMC 23.54.030.L.2.a'},
+          {k:'plain', t:' states that when parking is provided for nonresidential uses, a minimum of 30 percent of those spaces shall be EV-ready, except as modified by .2.b and .2.c.'},
+          {k:'note', t:'Quietly corrects the false 10% premise by surfacing the actual 30% number from the cited section and explaining the .2.b/.2.c exceptions. Does not explicitly call out the premise as false, which costs it one point on faithfulness.'}
+        ],
+        evidence:[ {k:'chunk', t:'SMC 23.54.030 (top-1)'}, {k:'chunk', t:'SMC 23.54.020'}, {k:'chunk', t:'SMC 23.49.019'}, {k:'kg', t:'+ EV-ready entity expansion'} ],
+        cites:[ {c:'SMC 23.54.030', kind:'hit'}, {c:'SMC 23.54.020', kind:'miss'} ],
+        scores:[ {k:'M4 · Correct', v:'5/5', tone:'good'}, {k:'Faith', v:'4/5', tone:'mid'}, {k:'M1 · Cite', v:'2/2 valid', tone:'good'} ] },
+      { id:'C', name:'Arm C · Naive RAG', sub:'vector-only, no graph · Round 2 capture', drift:'mid', driftLabel:'explicit correction · no canonical cite', projected:false,
+        segments:[
+          {k:'match', t:'The base EV-ready requirement for nonresidential parking is 30% of spaces, not 10%,'},
+          {k:'plain', t:' with 10% applying only to certain listed uses as an alternative standard. '},
+          {k:'note', t:'Explicitly flags the false premise ("not 10%"), the cleanest premise-correction of the three arms. But the only "citation" is the inline "[Source 1]" label, so M1 lands undefined and the row is excluded from C\'s precision denominator.'}
+        ],
+        evidence:[ {k:'chunk', t:'SMC 23.54.030.L (vector hit)'} ],
+        cites:[ {c:'[Source 1] · SMC 23.54.030.L', kind:'miss'} ],
+        scores:[ {k:'M4 · Correct', v:'5/5', tone:'good'}, {k:'Faith', v:'3/5', tone:'mid'}, {k:'M1 · Cite', v:'n/a (no canonical cite)', tone:'mid'} ] },
+      { id:'D', name:'Arm D · GPT 5.1', sub:'public model, no retrieval · Round 2 capture', drift:'high', driftLabel:'accepts false premise · self-contradicts', projected:false,
+        segments:[
+          {k:'plain', t:'Under '},
+          {k:'match', t:'SMC 23.54.030.L.2.a'},
+          {k:'plain', t:', the baseline requirement for nonresidential EV-Ready spaces is '},
+          {k:'miss', t:'10% of total off-street parking spaces. → 10 percent.'},
+          {k:'note', t:'Accepts the question\'s false 10% premise and parrots it back as the answer. Cites the exact correct subsection, whose actual text says 30%, not 10%, so D contradicts its own citation. Worst combination on a L6 trap.'}
+        ],
+        evidence:[ {k:'none', t:'⊘ no retrieval, premise from prompt accepted as fact'} ],
+        cites:[ {c:'SMC 23.54.030.L.2.', kind:'miss'} ],
+        scores:[ {k:'M4 · Correct', v:'0/5', tone:'bad'}, {k:'Faith', v:'1/5', tone:'bad'}, {k:'M1 · Cite', v:'1/1 valid', tone:'good'} ] }
+    ],
+    kgEdge:'L6 false-premise trap. Both retrieval-backed arms ignore the planted 10% number and surface the real 30% from the cited section. C is most explicit about the correction ("not 10%"). Arm D collapses: parrots the false premise as the answer, then cites the very section that proves it wrong. Note that M1 still marks D\'s citation as valid because the cited section is real, the failure shows up entirely in correctness and faithfulness, not precision.',
+    verdict:'A and C correctly land on 30%. C is more explicit about the false premise. D accepts the trap and answers 10%, contradicting its own citation.'
+  }
+];
+
+const exTabs = document.getElementById('exTabs');
+const exQuestion = document.getElementById('exQuestion');
+const exGoldBody = document.getElementById('exGoldBody');
+const exGoldCite = document.getElementById('exGoldCite');
+const exGrid = document.getElementById('exGrid');
+const exVerdict = document.getElementById('exVerdict');
+const kgEdgeBody = document.getElementById('kgEdgeBody');
+
+// safe mini-parser: only handles <code> and <strong> tags, all content via textContent
+function renderKgEdge(parent, source){
+  parent.textContent = '';
+  const tagRegex = /<(code|strong)>([\s\S]*?)<\/\1>/g;
+  const matches = [...source.matchAll(tagRegex)];
+  let last = 0;
+  matches.forEach(m => {
+    if(m.index > last){
+      parent.appendChild(document.createTextNode(source.slice(last, m.index)));
+    }
+    const el = document.createElement(m[1]);
+    el.textContent = m[2];
+    parent.appendChild(el);
+    last = m.index + m[0].length;
+  });
+  if(last < source.length){
+    parent.appendChild(document.createTextNode(source.slice(last)));
+  }
+}
+
+function renderSegments(parent, segments){
+  parent.textContent = '';
+  segments.forEach(s => {
+    if(s.k === 'plain'){
+      parent.appendChild(document.createTextNode(s.t));
+    } else if(s.k === 'note'){
+      const n = document.createElement('span');
+      n.className = 'note';
+      n.textContent = s.t;
+      parent.appendChild(n);
+    } else {
+      const span = document.createElement('span');
+      span.className = s.k;
+      span.textContent = s.t;
+      parent.appendChild(span);
+    }
+  });
+}
+
+function showExhibit(i){
+  exTabs.querySelectorAll('.ex-tab').forEach((el,j) => el.classList.toggle('active', j === i));
+  const ex = exhibits[i];
+  exQuestion.textContent = ex.question;
+  exGoldBody.textContent = ex.gold.body;
+  exGoldCite.textContent = '';
+  const tick = document.createTextNode('✓ ');
+  exGoldCite.appendChild(tick);
+  exGoldCite.appendChild(document.createTextNode(ex.gold.cite));
+  exVerdict.textContent = ex.verdict;
+
+  // KG-edge callout: render with safe DOM construction
+  renderKgEdge(kgEdgeBody, ex.kgEdge);
+
+  exGrid.textContent = '';
+  ex.arms.forEach(arm => {
+    const card = document.createElement('div');
+    card.className = 'arm-card arm-' + arm.id;
+
+    const head = document.createElement('div');
+    head.className = 'arm-head';
+    const headLeft = document.createElement('div');
+    const nm = document.createElement('div');
+    nm.className = 'arm-name';
+    nm.textContent = arm.name;
+    const sub = document.createElement('div');
+    sub.className = 'arm-sub';
+    sub.textContent = arm.sub;
+    headLeft.appendChild(nm);
+    headLeft.appendChild(sub);
+    head.appendChild(headLeft);
+    const drift = document.createElement('span');
+    drift.className = 'arm-drift ' + arm.drift;
+    drift.textContent = arm.driftLabel;
+    head.appendChild(drift);
+    card.appendChild(head);
+
+    const body = document.createElement('div');
+    body.className = 'arm-body';
+    if(arm.projected){
+      const pj = document.createElement('div');
+      pj.className = 'arm-projected';
+      pj.textContent = '◇ projected · pending run';
+      body.appendChild(pj);
+    }
+    renderSegments(body, arm.segments);
+    card.appendChild(body);
+
+    const evd = document.createElement('div');
+    evd.className = 'evidence';
+    const evLbl = document.createElement('span');
+    evLbl.className = 'ev-lbl';
+    evLbl.textContent = 'saw';
+    evd.appendChild(evLbl);
+    arm.evidence.forEach((e, idx) => {
+      const c = document.createElement('span');
+      c.className = 'ev-chip ' + e.k;
+      c.textContent = e.t;
+      evd.appendChild(c);
+    });
+    card.appendChild(evd);
+
+    const cites = document.createElement('div');
+    cites.className = 'arm-cites';
+    arm.cites.forEach(c => {
+      const p = document.createElement('span');
+      p.className = 'cite-pill ' + c.kind;
+      if(c.kind === 'hit'){ p.appendChild(document.createTextNode('✓ ')); }
+      else if(c.kind === 'miss'){ p.appendChild(document.createTextNode('⚠ ')); }
+      p.appendChild(document.createTextNode(c.c));
+      cites.appendChild(p);
+    });
+    card.appendChild(cites);
+
+    const foot = document.createElement('div');
+    foot.className = 'arm-foot';
+    arm.scores.forEach(s => {
+      const sc = document.createElement('span');
+      sc.className = 'score s-' + s.tone;
+      const k = document.createElement('span');
+      k.textContent = s.k;
+      const v = document.createElement('span');
+      v.className = 'v';
+      v.textContent = s.v;
+      sc.appendChild(k);
+      sc.appendChild(v);
+      foot.appendChild(sc);
+    });
+    card.appendChild(foot);
+
+    exGrid.appendChild(card);
+  });
+}
+exTabs.querySelectorAll('.ex-tab').forEach((el,i) => el.addEventListener('click', () => showExhibit(i)));
+showExhibit(0);
+
+// ====================================================================
+// ============ SECTION 10 · INSIDE THE ANSWER ============
+// ====================================================================
+
+const pipelineSteps = {
+  A: ['query','vector','bm25','rerank','graph','entity','llm'],
+  C: ['query','vector','llm'],
+  D: ['query','llm']
+};
+const pipelineNotes = {
+  A: 'Full pipeline. Hybrid retrieval (vector + BM25), reranker, graph expansion to linked provisions, custom regulatory entity recognition, then synthesis with citations.',
+  C: 'Single-pass vector retrieval feeds an LLM. No reranker, no graph, no entity layer. Works on the easy cases. Loses cross-agency and gap-detection wins.',
+  D: 'No retrieval at all. The LLM answers from priors. Fluent, often confident, frequently wrong on specifics it never saw.'
+};
+
+// step-level deep detail: what each step is, who runs it, how it shifts by tier, and real examples
+const stepDetail = {
+  query: {
+    no: 'step 1 / 7',
+    title: 'Query',
+    tagline: 'parse the user\'s question; decide what kind of answer it needs',
+    body: 'The system reads the question and, before retrieving anything, classifies it: definition, threshold/numeric, cross-agency, conflict, false-premise, or no-answer. Complex questions get decomposed into 2-3 sub-queries that are run in parallel downstream.',
+    perArm: [
+      { who:'A', verdict:'active', desc:'Intent classifier + decomposer. GPT-4.1 mini for speed; cheap, deterministic. Multi-hop questions get split before retrieval.' },
+      { who:'C', verdict:'partial', desc:'Single embedding pass on the raw query. No intent layer, no decomposition.' },
+      { who:'D', verdict:'partial', desc:'Query goes straight to the model. No classification, no decomposition.' }
+    ],
+    tiers: [
+      { tag:'L1', text:'Single-hop. No decomposition. All three arms behave similarly here.' },
+      { tag:'L3-L4', text:'Decomposition matters: "How does state law preempt SMC?" splits into "what does state law say" + "what does SMC say".' },
+      { tag:'L5', text:'Almost always decomposed. Conflict questions need both sides retrieved separately.' },
+      { tag:'False premise', text:'Intent classifier flags premise claims ("since X has no Y") and triggers a verification check before retrieval.' }
+    ],
+    examples: [
+      { qid:'L1-PARK-001', text:'Single intent: <code>definition</code>. Pass through unchanged.' },
+      { qid:'L6-PARK-001', text:'Intent <code>false_premise</code> detected. The premise "no legal minimum" is flagged for verification before the answer is synthesized.' }
+    ]
+  },
+  vector: {
+    no: 'step 2 / 7',
+    title: 'Vector retrieval',
+    tagline: 'find semantically similar chunks from the corpus',
+    body: 'Each query is embedded with text-embedding-3-large (3072 dimensions) and matched against pre-embedded chunks in LanceDB. The top 50 candidates by cosine similarity move forward. Strong on paraphrased and conceptual phrasing; weak on numbers and rare section identifiers.',
+    perArm: [
+      { who:'A', verdict:'active', desc:'Top-50 candidates pulled in parallel with BM25. The 50 is intentional headroom for the reranker.' },
+      { who:'C', verdict:'active', desc:'Top-K (typically 5). No fusion partner. The output goes straight to the LLM.' },
+      { who:'D', verdict:'absent', desc:'No retrieval; no corpus access.' }
+    ],
+    tiers: [
+      { tag:'L1 numeric', text:'Vector alone often misses. Numbers like "13 feet" don\'t carry strong embeddings; BM25 wins these.' },
+      { tag:'L2-L3 conceptual', text:'Vector is the strongest signal. Paraphrased questions resolve here.' },
+      { tag:'L5 conflict', text:'Vector finds one side easily. Finding both sides usually needs BM25 + graph downstream.' }
+    ],
+    examples: [
+      { qid:'L1-PARK-001', text:'Query "tandem parking" embeds close to the SMC definitions chunk; the right chunk is in the top 5.' },
+      { qid:'L4-PARK-001', text:'Query "bus parking space dimensions" embeds well; SMC 23.54.030 ¶ bus is in the top 3.' }
+    ]
+  },
+  bm25: {
+    no: 'step 3 / 7',
+    title: 'BM25 keyword retrieval',
+    tagline: 'exact-match lexical search, fused with vector results',
+    body: 'A sparse keyword retriever runs in parallel with vector search. BM25 catches exact section references ("SMC 23.54.030"), defined terms ("tandem parking"), and specific numbers ("13 feet"). The top 20 BM25 hits are fused with the 50 vector hits using reciprocal rank fusion.',
+    perArm: [
+      { who:'A', verdict:'active', desc:'Hybrid fusion (vector + BM25) gives ~15% lift on regulatory questions where exact terms matter.' },
+      { who:'C', verdict:'absent', desc:'Vector only. Misses chunks that match on exact identifiers.' },
+      { who:'D', verdict:'absent', desc:'No retrieval.' }
+    ],
+    tiers: [
+      { tag:'L1 numeric', text:'Critical. "13 feet" matches BM25 verbatim where vector struggles.' },
+      { tag:'Section lookups', text:'BM25 catches "SMC 23.54.030" cleanly when the chunk has that exact string.' },
+      { tag:'L5 conflict', text:'Finds the rarer document (a 1980s Director\'s Rule) by section number where vector misses it.' }
+    ],
+    examples: [
+      { qid:'L4-PARK-001', text:'BM25 surfaces "bus parking space" verbatim from SMC 23.54.030. Vector alone might rank a generic "parking dimensions" chunk higher.' }
+    ]
+  },
+  rerank: {
+    no: 'step 4 / 7',
+    title: 'Rerank',
+    tagline: 'cross-encoder scores each candidate against the query',
+    body: 'The 70 candidates (50 vector + 20 BM25, deduplicated) are scored by a cross-encoder that reads the query and chunk together. This is a higher-precision signal than cosine similarity. Top 5 survive into the synthesis context window.',
+    perArm: [
+      { who:'A', verdict:'active', desc:'BGE-style reranker. Cuts noise sharply; pushes the answer-bearing chunk to rank 1 most of the time.' },
+      { who:'C', verdict:'absent', desc:'No reranker. Top-K from vector is final. Susceptible to "on-topic but wrong" chunks.' },
+      { who:'D', verdict:'absent', desc:'No retrieval.' }
+    ],
+    tiers: [
+      { tag:'All tiers', text:'Pure noise reduction. Vector returns chunks that are about the topic; reranker keeps the ones that contain the answer.' },
+      { tag:'L5 conflict', text:'Highest impact. A chunk that DISCUSSES conflict (e.g., commentary) gets pushed below the chunks that ARE the rule.' }
+    ],
+    examples: [
+      { qid:'L6-PARK-001', text:'Vector returns several "minimum stall size" chunks. Reranker picks the one with the actual table (small/medium/large) over a chunk that just mentions the term.' }
+    ]
+  },
+  graph: {
+    no: 'step 5 / 7',
+    title: 'Knowledge graph expansion',
+    tagline: 'follow edges from retrieved chunks to linked provisions',
+    body: 'Each top-5 chunk has nodes in a Kuzu graph database. The graph encodes cross-references ("see also"), parent/child sections, prior versions, and named-entity links. A 2-hop expansion adds 3-5 linked nodes that contain the rest of the answer in cross-agency questions.',
+    perArm: [
+      { who:'A', verdict:'active', desc:'2-hop expansion in Kuzu. Adds linked provisions, definitions, sibling sections. Where the moat lives.' },
+      { who:'C', verdict:'absent', desc:'No graph layer. Cross-references are invisible unless they happen to be in the same chunk as the answer.' },
+      { who:'D', verdict:'absent', desc:'No retrieval.' }
+    ],
+    tiers: [
+      { tag:'L1', text:'Often a no-op. The answer sits in one chunk; nothing to link to.' },
+      { tag:'L3-L4 cross-doc', text:'Critical. SMC chunk gets linked to its RCW preemption clause via a "preempted_by" edge.' },
+      { tag:'L5 conflict', text:'Essential. The graph knows DR 8-2003 cross-references SMC 23.54.020. Retrieves both sides; without this, Naive RAG sees only one.' }
+    ],
+    examples: [
+      { qid:'L1-PARK-001', text:'Expanded the definition chunk to <code>SMC 23.54.030.A.1</code>, <code>.A.2</code>, <code>.A.3</code> (the referenced subsections).' },
+      { qid:'L4-PARK-001', text:'No relevant graph neighbors for vertical clearance. The system surfaces the silence instead of filling it.' },
+      { qid:'L6-PARK-001', text:'Linked SMC 23.54.030 to <strong>WAC 365-196-875</strong> via "state_floor" edge. Brings the state cap into the answer.' }
+    ]
+  },
+  entity: {
+    no: 'step 6 / 7',
+    title: 'Custom entity recognition',
+    tagline: 'flag regulated terms; trigger premise checks; detect gaps',
+    body: 'A custom NER model trained on the Seattle regulatory corpus tags regulated terms ("tandem parking", "ADU", "shoreline area", "false premise"). Each entity resolves to a canonical citation set. If a question references an entity but the graph has no node for it, the system surfaces the gap rather than guessing.',
+    perArm: [
+      { who:'A', verdict:'active', desc:'Custom NER model + premise-claim detector + gap-detection rule. This is where domain knowledge lives.' },
+      { who:'C', verdict:'absent', desc:'No entity layer. Treats regulated terms as ordinary words.' },
+      { who:'D', verdict:'absent', desc:'No retrieval, but the model may recognize common terms from priors.' }
+    ],
+    tiers: [
+      { tag:'Definition Q', text:'Critical. "What is tandem parking?" → entity match resolves directly to SMC 23.54.030 ¶ def.' },
+      { tag:'Gap detection', text:'When an entity ("vertical clearance for bus space") has no graph node, the system reports the silence.' },
+      { tag:'False premise', text:'Premise-claim detector ("since X has no Y") triggers a verification path before synthesis.' }
+    ],
+    examples: [
+      { qid:'L4-PARK-001', text:'Entity <code>"vertical clearance"</code> queried as a neighbor of <code>"bus parking space"</code>. Returns <strong>nothing</strong>. Answer says so.' },
+      { qid:'L6-PARK-001', text:'Premise claim <code>"no legal minimum"</code> caught. Verification path retrieves the actual minimums and corrects the premise.' }
+    ]
+  },
+  llm: {
+    no: 'step 7 / 7',
+    title: 'LLM synthesis',
+    tagline: 'GPT-5.1 writes the answer with strict citations',
+    body: 'The retrieved chunks (+ graph expansions + entity tags for KG-RAG) go into a strict prompt: cite only what you retrieved, do not fabricate section numbers, refuse if the corpus is silent. Same model across all retrieval arms; the differentiator is what arrived in the context.',
+    perArm: [
+      { who:'A', verdict:'active', desc:'GPT-5.1 with chunk + graph + entity context. Strict citation prompt. Highest-context input.' },
+      { who:'C', verdict:'active', desc:'GPT-5.1 with vector chunks only. Less context. Same model, less to work with.' },
+      { who:'D', verdict:'partial', desc:'GPT-5.1 with no retrieved context. Generates from priors. Same model, no grounding.' }
+    ],
+    tiers: [
+      { tag:'All tiers', text:'The LLM is the smallest differentiator. Same model across arms; the pipeline before it determines what the model has to work with.' },
+      { tag:'Garbage in', text:'When Naive RAG returns the wrong chunk, the LLM cites it confidently. Bad retrieval becomes a bad answer.' }
+    ],
+    examples: [
+      { qid:'L4-PARK-001', text:'Same model, three outcomes: KG-RAG (cited, complete), Naive (cited, omits the silence), ChatGPT (no retrieval, three wrong numbers).' }
+    ]
+  }
+};
+const pipeNote = document.getElementById('pipeNote');
+function showPipeline(arm){
+  document.querySelectorAll('#pipeArms .parm').forEach(b => b.classList.toggle('active', b.dataset.arm === arm));
+  const pipe = document.getElementById('pipeline');
+  // reset color tokens on pipeline by setting --c per arm
+  const colorMap = { A:'var(--good)', B:'var(--accent)', D:'var(--bad)' };
+  const softMap  = { A:'var(--good-soft)', B:'var(--accent-soft)', D:'var(--bad-soft)' };
+  pipe.style.setProperty('--c', colorMap[arm]);
+  pipe.style.setProperty('--csoft', softMap[arm]);
+  const onSteps = new Set(pipelineSteps[arm]);
+  const steps = pipe.querySelectorAll('.pstep');
+  const gaps = pipe.querySelectorAll('.pgap');
+  // animate sequentially
+  steps.forEach((s,i) => {
+    setTimeout(() => {
+      s.classList.toggle('on', onSteps.has(s.dataset.s));
+    }, i * 70);
+  });
+  gaps.forEach((g,i) => {
+    const prevOn = onSteps.has(steps[i].dataset.s);
+    const nextOn = onSteps.has(steps[i+1].dataset.s);
+    setTimeout(() => {
+      g.classList.toggle('on', prevOn && nextOn);
+    }, (i+0.5) * 70);
+  });
+  pipeNote.textContent = pipelineNotes[arm];
+}
+document.querySelectorAll('#pipeArms .parm').forEach(btn => btn.addEventListener('click', () => showPipeline(btn.dataset.arm)));
+showPipeline('A');
+
+// ---------- step-detail panel: click a pipeline step to drill in ----------
+const stepDetailEl = document.getElementById('stepDetail');
+
+function renderStepDetail(stepKey){
+  const d = stepDetail[stepKey];
+  if(!d){ stepDetailEl.textContent = ''; return; }
+
+  stepDetailEl.textContent = '';
+  document.querySelectorAll('#pipeline .pstep').forEach(s => s.classList.toggle('selected', s.dataset.s === stepKey));
+
+  const card = document.createElement('div'); card.className = 'sd-card';
+
+  const head = document.createElement('div'); head.className = 'sd-head';
+  const headLeft = document.createElement('div');
+  const title = document.createElement('div'); title.className = 'sd-title'; title.textContent = d.title;
+  const tag = document.createElement('div'); tag.className = 'sd-tagline'; tag.textContent = d.tagline;
+  headLeft.appendChild(title); headLeft.appendChild(tag);
+  head.appendChild(headLeft);
+  const step = document.createElement('span'); step.className = 'sd-step-no'; step.textContent = d.no;
+  head.appendChild(step);
+  card.appendChild(head);
+
+  const body = document.createElement('div'); body.className = 'sd-body';
+  body.textContent = d.body;
+  card.appendChild(body);
+
+  // per arm
+  const armsSec = document.createElement('div'); armsSec.className = 'sd-section';
+  const armsLbl = document.createElement('div'); armsLbl.className = 'sd-lbl'; armsLbl.textContent = 'Per arm';
+  armsSec.appendChild(armsLbl);
+  const armsRows = document.createElement('div'); armsRows.className = 'sd-rows';
+  const armNames = { A:'Arm A · KG-RAG', B:'Arm C · Naive', D:'Arm D · GPT 5.1' };
+  d.perArm.forEach(r => {
+    const row = document.createElement('div'); row.className = 'sd-row';
+    const who = document.createElement('span'); who.className = 'who ' + r.who; who.textContent = armNames[r.who];
+    const ver = document.createElement('span'); ver.className = 'verdict ' + r.verdict; ver.textContent = r.verdict;
+    const desc = document.createElement('span'); desc.className = 'desc'; desc.textContent = r.desc;
+    row.appendChild(who); row.appendChild(ver); row.appendChild(desc);
+    armsRows.appendChild(row);
+  });
+  armsSec.appendChild(armsRows);
+  card.appendChild(armsSec);
+
+  // tiers
+  const tiersSec = document.createElement('div'); tiersSec.className = 'sd-section';
+  const tiersLbl = document.createElement('div'); tiersLbl.className = 'sd-lbl'; tiersLbl.textContent = 'By question type';
+  tiersSec.appendChild(tiersLbl);
+  const tiersBox = document.createElement('div'); tiersBox.className = 'sd-tiers';
+  d.tiers.forEach(t => {
+    const row = document.createElement('div'); row.className = 'sd-tier';
+    const tag = document.createElement('span'); tag.className = 'tg'; tag.textContent = t.tag;
+    const txt = document.createElement('span'); txt.textContent = t.text;
+    row.appendChild(tag); row.appendChild(txt);
+    tiersBox.appendChild(row);
+  });
+  tiersSec.appendChild(tiersBox);
+  card.appendChild(tiersSec);
+
+  // examples (with inline <code> and <strong> support via the safe renderer)
+  if(d.examples && d.examples.length){
+    const exSec = document.createElement('div'); exSec.className = 'sd-section';
+    const exLbl = document.createElement('div'); exLbl.className = 'sd-lbl'; exLbl.textContent = 'In our gold-set examples';
+    exSec.appendChild(exLbl);
+    const exBox = document.createElement('div'); exBox.className = 'sd-examples';
+    d.examples.forEach(e => {
+      const row = document.createElement('div'); row.className = 'sd-ex';
+      const qid = document.createElement('span'); qid.className = 'qid'; qid.textContent = e.qid;
+      const txt = document.createElement('span'); txt.className = 'qtext';
+      renderKgEdge(txt, e.text); // reuse safe inline parser (handles <code>, <strong>)
+      row.appendChild(qid); row.appendChild(txt);
+      exBox.appendChild(row);
+    });
+    exSec.appendChild(exBox);
+    card.appendChild(exSec);
+  }
+
+  stepDetailEl.appendChild(card);
+}
+
+document.querySelectorAll('#pipeline .pstep').forEach(step => {
+  step.addEventListener('click', () => renderStepDetail(step.dataset.s));
+});
+
+// ---------- TOC active-state ----------
+const tocLinks = document.querySelectorAll('#toc a');
+const sections = document.querySelectorAll('section.chapter');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      const id = e.target.id;
+      tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    }
+  });
+}, { rootMargin: '-40% 0px -55% 0px', threshold: 0 });
+sections.forEach(s => io.observe(s));
+
+// smooth scroll
+tocLinks.forEach(a => {
+  a.addEventListener('click', (e) => {
+    const href = a.getAttribute('href');
+    if(href && href.startsWith('#')){
+      e.preventDefault();
+      const t = document.querySelector(href);
+      if(t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+
+// fade-in on scroll
+const fadeIo = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); });
+}, { threshold: 0.08 });
+document.querySelectorAll('section.chapter, .surface, .pullquote').forEach(el => {
+  el.classList.add('fade');
+  fadeIo.observe(el);
+});
+</script>
+</body>
+</html>

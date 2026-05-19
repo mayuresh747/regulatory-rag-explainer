@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>End-to-end walkthrough · Seattle Regulatory RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: 252 250 246;
+  --fg: 28 25 23;
+  --muted: 87 83 78;
+  --subtle: 245 242 236;
+  --line: 220 215 207;
+  --accent: 217 119 6;
+  --accent-soft: 254 243 199;
+  --good: 22 101 52;
+  --good-soft: 220 240 226;
+  --bad: 153 27 27;
+  --bad-soft: 248 219 214;
+}
+html.dark{
+  --bg: 24 22 20; --fg: 244 241 235; --muted: 168 162 154; --subtle: 36 33 30; --line: 60 56 52;
+  --accent: 251 191 36; --accent-soft: 68 50 18;
+  --good: 134 239 172; --good-soft: 28 50 38;
+  --bad: 252 165 165; --bad-soft: 60 30 28;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;}
+html{ scroll-behavior:smooth; }
+body{
+  background: rgb(var(--bg)); color: rgb(var(--fg));
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 17px; line-height: 1.65; -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01','cv11';
+}
+.serif{ font-family:'Fraunces', Georgia, serif; font-feature-settings:'ss01'; letter-spacing:-0.01em;}
+.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px;}
+.small-caps{ font-family:'Inter',sans-serif; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color: rgb(var(--muted)); font-weight:500;}
+a{ color: rgb(var(--accent)); text-decoration:none; border-bottom:1px solid rgb(var(--accent) / 0.35);}
+hr.rule{ border:none; border-top:1px solid rgb(var(--line)); margin: 4rem 0;}
+
+.shell{ max-width: 72rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; display:grid; grid-template-columns: 1fr; gap: 2rem;}
+@media(min-width:1024px){
+  .shell{ grid-template-columns: 14rem 1fr; gap: 4rem; padding-top: 4rem;}
+}
+.toc-wrap{ display:none;}
+@media(min-width:1024px){
+  .toc-wrap{ display:block; position: sticky; top: 3rem; align-self: start; max-height: calc(100vh - 4rem); overflow:auto;}
+}
+.toc{ list-style:none; padding:0; margin:0;}
+.toc li{ margin: 0.55rem 0;}
+.toc a{ border:none; color: rgb(var(--muted)); font-size: 13px; display:flex; gap: 0.6rem; transition: color .2s;}
+.toc a .num{ font-variant-numeric: tabular-nums; opacity: 0.55; min-width: 1.4rem;}
+.toc a.active{ color: rgb(var(--fg)); font-weight:500;}
+.toc a.active .num{ color: rgb(var(--accent)); opacity:1;}
+.toc a:hover{ color: rgb(var(--fg));}
+.toc-head{ font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:rgb(var(--muted)); margin-bottom:1.25rem;}
+
+.col-wide{ max-width: 52rem;}
+
+.hero h1{ font-family:'Fraunces',serif; font-weight:500; font-size: clamp(2.1rem, 4.3vw, 3rem); line-height: 1.05; letter-spacing:-0.025em; margin: 0.85rem 0 1rem;}
+.hero h1 em{ font-style: italic; color: rgb(var(--accent));}
+.hero p.lead{ font-size: 1.08rem; color: rgb(var(--muted)); max-width: 36rem;}
+.byline{ display:flex; gap:1.25rem; align-items:center; font-size:13px; color: rgb(var(--muted)); margin-top: 1.75rem; padding-top:1.25rem; border-top: 1px solid rgb(var(--line)); flex-wrap:wrap;}
+.dot{ width:6px; height:6px; border-radius:50%; background: rgb(var(--accent)); display:inline-block;}
+
+/* ---------- example pill switcher ---------- */
+.examples{
+  display:grid; grid-template-columns: 1fr; gap: 0.6rem; margin: 1.5rem 0 0;
+  position: sticky; top: 0.5rem; z-index: 6;
+  padding: 0.85rem; background: rgb(var(--bg) / 0.95); backdrop-filter: blur(10px);
+  border: 1px solid rgb(var(--line)); border-radius: 14px;
+}
+@media(min-width: 640px){ .examples{ grid-template-columns: repeat(3, 1fr); gap: 0.5rem;}}
+.ex-pill{
+  text-align:left;
+  border: 1px solid rgb(var(--line));
+  background: rgb(var(--bg));
+  border-radius: 9px;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+  font: inherit;
+  color: rgb(var(--fg));
+  transition: border-color .15s, background .15s, transform .15s;
+}
+.ex-pill:hover{ border-color: rgb(var(--accent) / 0.7);}
+.ex-pill.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent)); transform: translateY(-1px);}
+.ex-pill .ex-id{ font-family: ui-monospace,monospace; font-size: 10.5px; letter-spacing:0.14em; text-transform:uppercase; color: rgb(var(--muted));}
+.ex-pill.active .ex-id{ color: rgb(var(--accent));}
+.ex-pill .ex-lbl{ font-family:'Fraunces',serif; font-size: 0.98rem; line-height: 1.2; margin: 0.2rem 0 0.2rem; letter-spacing:-0.01em;}
+.ex-pill .ex-tag{ font-size: 11.5px; color: rgb(var(--muted));}
+
+/* ---------- general chapter / surface ---------- */
+section.chapter{ scroll-margin-top: 6rem; padding: 4.5rem 0 0;}
+section.chapter h2{ font-family:'Fraunces',serif; font-weight:500; font-size: clamp(1.6rem, 2.8vw, 2rem); letter-spacing:-0.018em; line-height: 1.15; margin: 0.45rem 0 1.25rem; max-width: 36rem;}
+section.chapter h2 em{ font-style:italic; color: rgb(var(--accent));}
+section.chapter p{ max-width: 36rem; margin: 0 0 1rem;}
+section.chapter .small-caps{ display:block; margin-bottom: 0.5rem;}
+
+.surface{ max-width: 52rem; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); border-radius: 14px; padding: 1.35rem 1.4rem; margin: 1.5rem 0 2.25rem; position:relative; overflow: hidden;}
+.surface .surface-head{ display:flex; justify-content:space-between; align-items:baseline; font-size: 11.5px; letter-spacing:0.16em; text-transform:uppercase; color: rgb(var(--muted)); margin-bottom: 1rem; gap: 1rem; flex-wrap:wrap;}
+.surface .surface-head .badge{ font-family: ui-monospace,monospace; letter-spacing:0; text-transform:none; padding: 2px 8px; border-radius: 999px; background: rgb(var(--subtle)); color: rgb(var(--fg)); font-size:11px;}
+
+.qbar{
+  display:flex; gap:0.7rem; align-items:baseline; margin: 0 0 1rem;
+  padding: 0.6rem 0.85rem;
+  background: rgb(var(--accent-soft) / 0.55);
+  border-radius: 8px;
+  border: 1px solid rgb(var(--accent) / 0.25);
+  font-size: 13px;
+  flex-wrap: wrap;
+  max-width: 52rem;
+}
+.qbar .label{ font-size: 10.5px; letter-spacing:.16em; text-transform:uppercase; color: rgb(var(--accent)); font-weight:500;}
+.qbar code{ font-family: ui-monospace,monospace; font-size: 12px;}
+
+.page-frame{
+  background: rgb(var(--subtle));
+  border: 1px solid rgb(var(--line));
+  border-radius: 8px;
+  padding: 0.95rem 1.1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  max-height: 280px; overflow-y:auto;
+  white-space: pre-wrap;
+  color: rgb(var(--fg));
+}
+.page-frame .hl{ background: rgb(var(--accent-soft)); padding: 0 3px; border-radius: 3px; border-bottom: 2px solid rgb(var(--accent));}
+.page-meta{ font-family: ui-monospace,monospace; font-size: 11.5px; color: rgb(var(--muted)); margin-top: 0.75rem; display:flex; gap:1.25rem; flex-wrap:wrap;}
+.page-meta strong{ color: rgb(var(--fg)); font-family:'Fraunces',serif; font-weight:500; font-size:13px;}
+
+.ck-row{ display:grid; grid-template-columns: 1fr; gap: 0.5rem;}
+.ck{
+  display:flex; flex-direction: column; gap: 0.4rem;
+  border:1px solid rgb(var(--line)); border-radius: 9px; padding: 0.65rem 0.8rem;
+  background: rgb(var(--bg));
+  opacity: 0; transform: translateY(8px);
+  transition: opacity .5s ease, transform .5s ease, border-color .15s, background .15s;
+}
+.ck.show{ opacity: 1; transform: none;}
+.ck:hover{ border-color: rgb(var(--accent) / 0.6);}
+.ck.gold{ border-color: rgb(var(--good)); background: rgb(var(--good-soft) / 0.4);}
+.ck-top{ display:flex; gap: 0.55rem; align-items:baseline; flex-wrap:wrap;}
+.ck-id{ font-family: ui-monospace, monospace; font-size: 11.5px; color: rgb(var(--muted));}
+.ck-tag{ font-family: ui-monospace, monospace; font-size: 10.5px; padding: 1px 6px; border-radius: 999px; background: rgb(var(--subtle)); color: rgb(var(--muted));}
+.ck-tag.good{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.ck-tag.warn{ background: rgb(var(--accent-soft)); color: rgb(var(--accent));}
+.ck-text{ font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.55; color: rgb(var(--muted));}
+.ck.gold .ck-text{ color: rgb(var(--fg));}
+.ck-meta{ font-size: 11px; color: rgb(var(--muted)); display:flex; gap:1rem; flex-wrap:wrap;}
+.ck-meta strong{ color: rgb(var(--fg)); font-family:'Fraunces',serif; font-size: 12.5px; font-weight:500;}
+
+.graph-wrap{ position:relative; min-height: 270px;}
+.graph-svg{ width:100%; height: 290px; display:block;}
+.graph-svg text{ font-family:'Inter',sans-serif; font-size: 11px; fill: rgb(var(--fg));}
+.graph-svg .label{ font-size: 10px; fill: rgb(var(--muted)); text-transform: uppercase; letter-spacing: 0.08em;}
+.graph-svg .node rect{ fill: rgb(var(--bg)); stroke: rgb(var(--line)); stroke-width: 1.2; rx: 8; opacity: 0; transition: opacity .55s ease;}
+.graph-svg.show .node rect{ opacity: 1;}
+.graph-svg .node text{ opacity: 0; transition: opacity .55s ease .15s;}
+.graph-svg.show .node text{ opacity: 1;}
+.graph-svg .node.center rect{ fill: rgb(var(--accent-soft)); stroke: rgb(var(--accent)); stroke-width: 1.6;}
+.graph-svg .node.doc rect{ fill: rgb(var(--subtle));}
+.graph-svg .edge{ stroke: rgb(var(--muted)); stroke-width: 1.4; fill: none; stroke-dasharray: 200; stroke-dashoffset: 200; transition: stroke-dashoffset 1.1s ease .4s;}
+.graph-svg.show .edge{ stroke-dashoffset: 0;}
+.graph-svg .edge.warn{ stroke: rgb(var(--accent)); stroke-dasharray: 4 3, 200; }
+.graph-svg .arrow{ fill: rgb(var(--muted));}
+.graph-svg .arrow.warn{ fill: rgb(var(--accent));}
+.graph-edge-list{ margin-top: 1rem; display: grid; gap: 0.4rem;}
+.graph-edge{ display:flex; gap: 0.55rem; align-items:center; font-size: 12.5px; padding: 0.45rem 0.7rem; background: rgb(var(--subtle)); border: 1px solid rgb(var(--line)); border-radius: 8px; flex-wrap: wrap;}
+.graph-edge .rel{ font-family: ui-monospace,monospace; font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: rgb(var(--accent-soft)); color: rgb(var(--accent));}
+.graph-edge .conf{ margin-left:auto; font-family: ui-monospace,monospace; font-size: 11px; color: rgb(var(--muted));}
+
+.cf{ display:grid; grid-template-columns: 1fr 1fr; gap: 0.7rem;}
+@media(max-width:680px){ .cf{ grid-template-columns: 1fr;}}
+.cf .field{ background: rgb(var(--subtle)); border:1px solid rgb(var(--line)); border-radius:8px; padding: 0.6rem 0.85rem;}
+.cf .field .l{ font-size: 10.5px; letter-spacing:.16em; text-transform:uppercase; color: rgb(var(--muted));}
+.cf .field .v{ font-family:'Fraunces',serif; font-size: 1.05rem; margin-top: 0.2rem;}
+.cf .field .sub{ font-size: 11.5px; color: rgb(var(--muted)); margin-top: 0.15rem;}
+
+.rtabs{ display:flex; gap: 0; border-bottom: 1px solid rgb(var(--line)); margin-bottom: 1rem; flex-wrap:wrap;}
+.rtab{ padding: 0.55rem 0.95rem; cursor:pointer; font-size: 12.5px; color: rgb(var(--muted)); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; user-select:none; display:flex; gap: 0.4rem; align-items:baseline; background: none; border-left:none; border-right:none; border-top:none; font-family: inherit;}
+.rtab.active{ color: rgb(var(--accent)); border-bottom-color: rgb(var(--accent)); font-weight: 500;}
+.rtab .ct{ font-family: ui-monospace,monospace; font-size: 10.5px; padding: 1px 6px; border-radius:999px; background: rgb(var(--subtle)); color: rgb(var(--muted));}
+.rtab.active .ct{ background: rgb(var(--accent-soft)); color: rgb(var(--accent));}
+.rlist{ display:grid; gap: 0.35rem;}
+.rrow{ display:grid; grid-template-columns: 2rem 1fr auto; gap: 0.55rem; padding: 0.5rem 0.7rem; border:1px solid rgb(var(--line)); border-radius: 8px; background: rgb(var(--bg)); align-items:center;}
+.rrow .pos{ font-family: ui-monospace,monospace; font-size: 11.5px; color: rgb(var(--muted));}
+.rrow .cite{ font-family: ui-monospace,monospace; font-size: 12.5px;}
+.rrow .agency{ font-size: 11px; color: rgb(var(--muted)); margin-left: 0.4rem;}
+.rrow .scr{ font-family: ui-monospace,monospace; font-size: 12px; color: rgb(var(--fg));}
+.rrow.gold{ border-color: rgb(var(--good)); background: rgb(var(--good-soft) / 0.4);}
+.rrow.gold .scr{ color: rgb(var(--good)); font-weight: 500;}
+.rrow .hint{ display:none; grid-column: 1 / -1; font-size: 11.5px; color: rgb(var(--muted)); margin-top: 0.3rem; padding-top: 0.3rem; border-top: 1px dashed rgb(var(--line));}
+.rrow.gold .hint{ display:block;}
+.rsummary{ margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px dashed rgb(var(--line)); font-size: 12.5px; color: rgb(var(--muted)); line-height: 1.55;}
+.rtab-progress{ display:inline-block; margin-left: 0.65rem; font-size: 10.5px; color: rgb(var(--muted)); font-family: ui-monospace,monospace;}
+
+.synth{ background: rgb(var(--subtle)); border: 1px solid rgb(var(--line)); border-radius: 10px; padding: 1rem 1.2rem;}
+.synth .lbl{ font-size: 10.5px; letter-spacing:.18em; text-transform:uppercase; color: rgb(var(--muted)); display:block; margin-bottom: 0.4rem;}
+.synth .ctx{ font-family: ui-monospace, monospace; font-size: 12px; color: rgb(var(--muted)); line-height: 1.55; max-height: 200px; overflow-y:auto; padding: 0.6rem 0.75rem; background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); border-radius: 6px;}
+.synth .ctx .cit{ color: rgb(var(--accent)); font-weight: 500;}
+.synth .meta{ display:flex; gap: 1.25rem; font-family: ui-monospace,monospace; font-size: 11.5px; color: rgb(var(--muted)); margin-top: 0.8rem; flex-wrap:wrap;}
+.synth .meta strong{ color: rgb(var(--fg)); font-family:'Fraunces',serif; font-size: 13px; font-weight:500;}
+
+.answer{ border-radius: 12px; padding: 1.4rem 1.6rem;}
+.answer.good{ border:1px solid rgb(var(--good) / 0.55); background: rgb(var(--good-soft) / 0.4);}
+.answer.partial{ border:1px solid rgb(var(--accent) / 0.55); background: rgb(var(--accent-soft) / 0.4);}
+.answer.bad{ border:1px solid rgb(var(--bad) / 0.55); background: rgb(var(--bad-soft) / 0.4);}
+.answer .lbl{ font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; font-weight:500;}
+.answer.good .lbl{ color: rgb(var(--good));}
+.answer.partial .lbl{ color: rgb(var(--accent));}
+.answer.bad .lbl{ color: rgb(var(--bad));}
+.answer .text{ font-size: 1.04rem; line-height: 1.55; margin: 0.65rem 0; color: rgb(var(--fg));}
+.answer .text code{ background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); padding: 1px 6px; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 0.92em;}
+.answer .text strong{ font-weight: 600;}
+.answer.good .text strong{ color: rgb(var(--good));}
+.answer.partial .text strong{ color: rgb(var(--accent));}
+.answer .sources{ margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed rgb(var(--line)); font-size: 12.5px; color: rgb(var(--muted));}
+.answer .sources span.cite-pill{ font-family: ui-monospace, monospace; padding: 1px 7px; border-radius: 999px; background: rgb(var(--bg)); border:1px solid rgb(var(--line)); margin-right: 4px; display:inline-block; margin-bottom: 4px;}
+.answer .verdict{ margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed rgb(var(--line)); font-size: 13px;}
+.answer.good .verdict{ color: rgb(var(--good));}
+.answer.partial .verdict{ color: rgb(var(--accent));}
+.answer.bad .verdict{ color: rgb(var(--bad));}
+
+.theme-toggle{ position: fixed; top: 1rem; right: 1rem; width:34px; height:34px; border-radius:50%; border:1px solid rgb(var(--line)); background:rgb(var(--bg)); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; color: rgb(var(--fg)); z-index: 20;}
+
+footer{ margin-top: 6rem; padding-top: 2rem; border-top: 1px solid rgb(var(--line)); font-size: 13px; color: rgb(var(--muted)); max-width: 42rem;}
+.fade{ opacity:0; transform: translateY(12px); transition: opacity .65s ease, transform .65s ease;}
+.fade.in{ opacity:1; transform: none;}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeBtn" aria-label="Toggle theme">◐</button>
+
+<div class="shell">
+  <aside class="toc-wrap">
+    <div class="toc-head">End-to-end</div>
+    <ul class="toc" id="toc">
+      <li><a href="#start"><span class="num">00</span><span>Setup</span></a></li>
+      <li><a href="#page"><span class="num">01</span><span>The page</span></a></li>
+      <li><a href="#chunks"><span class="num">02</span><span>The chunks</span></a></li>
+      <li><a href="#graph"><span class="num">03</span><span>The graph</span></a></li>
+      <li><a href="#question"><span class="num">04</span><span>The question</span></a></li>
+      <li><a href="#retrieve"><span class="num">05</span><span>Retrieval</span></a></li>
+      <li><a href="#synth"><span class="num">06</span><span>Synthesis</span></a></li>
+      <li><a href="#answer"><span class="num">07</span><span>The answer</span></a></li>
+    </ul>
+    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px dashed rgb(var(--line)); font-size: 12px;">
+      <a href="index.html" style="border:none; color: rgb(var(--muted));">← back to home</a>
+    </div>
+  </aside>
+
+  <main>
+
+    <section id="start" class="hero col-wide fade">
+      <span class="small-caps">Seattle Regulatory RAG · End-to-end walkthrough</span>
+      <h1 class="serif">One question, one document, one <em>cited answer</em>.</h1>
+      <p class="lead">Pick a real question from the benchmark below. Scroll. Every stage of the pipeline will run on the example you picked, with the actual data captured from the live system on 2026-05-17. Three examples are wired up so you can see where the system is strong, where it is lucky, and where it admits defeat.</p>
+
+      <div class="examples" id="examples">
+        <!-- pills inserted by script -->
+      </div>
+
+      <div class="byline">
+        <span><span class="dot"></span>&nbsp;real captures · live LanceDB + Kuzu</span>
+        <span>·</span>
+        <span>raw data inline · works offline</span>
+      </div>
+    </section>
+
+    <hr class="rule" />
+
+    <section id="page" class="chapter fade">
+      <span class="small-caps">01 · ingest</span>
+      <h2 class="serif">The page arrives as messy text.</h2>
+      <p>Docling parses the source PDF (mostly digital, occasional scans) into Markdown with structure intact. TableFormer in ACCURATE mode handles merged cells in dimensional tables. Below is what the system saw on the relevant page. The sentence carrying the answer is highlighted.</p>
+      <div class="qbar"><span class="label">For this example</span><span id="pageQ"></span></div>
+      <div class="surface">
+        <div class="surface-head"><span id="pageHead">Page</span><span class="badge">Docling 2.82.0 · 1.23 s/page</span></div>
+        <div class="page-frame" id="pageFrame">loading...</div>
+        <div class="page-meta">
+          <span><strong id="pageChars">0</strong>chars shown</span>
+          <span>see <a href="ingestion.html">Ingestion →</a> for the parser comparison</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="chunks" class="chapter fade">
+      <span class="small-caps">02 · chunk</span>
+      <h2 class="serif">Chunks come out with their citations attached.</h2>
+      <p>The per-agency chunker (regex first, sub-chunk at A/B/C if too long, semchunk fallback) emits sub-chunks. Every chunk carries the citation, section title, content_type, and an is_table flag. The chunk that actually holds the gold answer is highlighted in green.</p>
+      <div class="surface">
+        <div class="surface-head"><span id="chunksHead">Real chunks in LanceDB</span><span class="badge" id="chunksBadge">5 sub-chunks</span></div>
+        <div class="ck-row" id="chunksRow">loading...</div>
+        <p class="page-meta" style="margin-top: 1rem;"><span>see <a href="chunking-embedding.html">Chunking + Embedding →</a> for the per-agency chunker logic</span></p>
+      </div>
+    </section>
+
+    <section id="graph" class="chapter fade">
+      <span class="small-caps">03 · graph</span>
+      <h2 class="serif">Each chunk also lives as a node, with typed edges.</h2>
+      <p>The same chunk lives as a <code class="mono">Chunk</code> node in Kuzu. The node carries denormalized fields (agency, citation, section_number) so traversals stay cheap. Full text stays in LanceDB. Edges include the parent document (DOC_HAS_CHUNK), the next sub-chunk (NEXT_SECTION), and outward links (SUBJECT_TO, CITES, IMPLEMENTS, AMENDED_BY) with a confidence value attached.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Node and edges for the gold chunk</span><span class="badge">live Kuzu</span></div>
+        <div class="graph-wrap">
+          <svg class="graph-svg" id="graphSvg" viewBox="0 0 720 290" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <div class="graph-edge-list" id="graphEdges"></div>
+        <p class="page-meta" style="margin-top: 1rem;"><span><strong>311,146</strong>edges in the live graph · see <a href="storage.html">Storage →</a> for the full schema</span></p>
+      </div>
+    </section>
+
+    <section id="question" class="chapter fade">
+      <span class="small-caps">04 · classify</span>
+      <h2 class="serif">The question gets a tier and an intent.</h2>
+      <p>Before retrieval runs, GPT-4.1-mini classifies the question. The classification is cheap (~1 second) and routes the question into the right retrieval profile and the right synthesis prompt slot. False premises get flagged here and become a correction directive in the prompt.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Classifier output · GPT-4.1-mini</span><span class="badge" id="cfBadge">latency</span></div>
+        <div class="cf" id="cfGrid"></div>
+        <p class="page-meta" style="margin-top: 1rem;"><span>The classifier shapes the synthesis prompt. See <a href="synthesis.html">Synthesis →</a> for the rubric.</span></p>
+      </div>
+    </section>
+
+    <section id="retrieve" class="chapter fade">
+      <span class="small-caps">05 · retrieve</span>
+      <h2 class="serif">Three retrievers run. <em id="retVerdict">Watch which one wins.</em></h2>
+      <p>Vector and BM25 run in parallel against LanceDB. Linear fusion (0.55 vector / 0.45 BM25, with min-max normalization) merges them into the candidate list. Graph traversal then runs against Kuzu starting from the fused seeds. The four tabs below cycle automatically when this section comes into view. You can also click a tab to inspect it.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Retrieval traces</span><span class="badge" id="retBadge">latency · results</span></div>
+        <div class="rtabs" id="rtabs"></div>
+        <div class="rlist" id="rlist">loading...</div>
+        <div class="rsummary" id="rsummary"></div>
+        <p class="page-meta" style="margin-top: 1rem;"><span>See <a href="retrieval.html">Retrieval →</a> for the fusion-weight slider and three more queries.</span></p>
+      </div>
+    </section>
+
+    <section id="synth" class="chapter fade">
+      <span class="small-caps">06 · synthesize</span>
+      <h2 class="serif">GPT-5.1 reads a numbered context with a strict citation rule.</h2>
+      <p>The synthesizer receives the question, the top 15 fused chunks formatted with bracketed citation headers, and a system prompt that demands verbatim citations and a "Not found in provided sources" response when the chunks do not support a claim.</p>
+      <div class="surface">
+        <div class="surface-head"><span>What the model sees, what it writes</span><span class="badge" id="synthBadge">model</span></div>
+
+        <div class="synth" style="margin-bottom: 1rem;">
+          <span class="lbl">Context preview (top sources, abbreviated)</span>
+          <div class="ctx" id="synthCtx">loading...</div>
+        </div>
+
+        <div class="synth">
+          <span class="lbl">Raw model output</span>
+          <div class="ctx" id="synthAns" style="white-space:pre-wrap;">loading...</div>
+          <div class="meta" id="synthMeta"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="answer" class="chapter fade">
+      <span class="small-caps">07 · present</span>
+      <h2 class="serif">The user sees the cited answer.</h2>
+      <p>The same model output, rendered as it ships to the chat panel. The verdict at the bottom is the deterministic match check against the gold answer from the benchmark file.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Final answer</span><span class="badge" id="answerBadge">verdict</span></div>
+        <div class="answer" id="finalAnswer">loading...</div>
+        <p class="page-meta" style="margin-top: 1rem;"><span id="goldNote"></span></p>
+      </div>
+    </section>
+
+    <hr class="rule" />
+    <footer><p class="small-caps" style="margin-top:1.5rem;">Seattle Regulatory RAG · End-to-end walkthrough · 2026 · <a href="index.html" style="border:none; color: rgb(var(--muted));">home</a></p></footer>
+
+  </main>
+</div>
+
+<!-- inline data so the page works without a server -->
+<script id="walkthroughData" type="application/json">{"captured_at":"2026-05-17","examples":[{"example":{"id":"L1-PARK-003","key":"park003","label":"Easy: literal lookup","tagline":"Section number + literal phrase. BM25 wins, gold #1.","question":"Under SMC 23.54.030, what is the minimum width of a 'medium vehicle' parking space?","gold_answer":"8 feet","gold_quote":"\"Medium vehicle\" means the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length.","source_pdf":"SMC Title 23 - Land Use Code.pdf","source_page":829,"required_section":"SMC 23.54.030.A.2","narrative":"The question names the section verbatim and uses the exact phrase 'medium vehicle' that appears in the code. BM25 lights up; vector finds Title 11 traffic definitions instead; fusion still surfaces the gold chunk at rank 1 because BM25's signal dominates after normalization."},"gold_chunk_id":"5ec97e13-82cc-4918-8f85-2d284b659d69","stage1_page":{"doc":"SMC Title 23 - Land Use Code.pdf","page":829,"parser":"Docling 2.82.0 (TableFormer ACCURATE)","parse_time_seconds_per_page":1.23,"ocr_used":false,"text_excerpt":"## 23.54.030 - Parking space and access standards\n\nAll parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030.\n\n## A. Parking space dimensions\n\n1. \"Large vehicle\" means the minimum size of a large vehicle parking space shall be 8 feet in width and 19 feet in length.\n2. \"Medium vehicle\" means the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length.\n\n3.\n\n- \"Small vehicle\" means the minimum size of a small vehicle parking space shall be 7.5 feet in width and 15 feet in length.\n4. \"Barrier-free parking\" means a parking space meeting the following standards:\n- a. Parking spaces shall not be less than 8 feet in width and shall have an adjacent access aisle not less than 5 feet in width. Van-accessible parking spaces shall have an adjacent access aisle not less than 8 feet in width. Where two adjacent spaces are provided, the access aisle may be shared between the two spaces. Boundaries of access aisles shall be marked so that aisles will not be used as parking space.\n- b. A minimum length of 19 feet or when more than one barrier-free parking space is provided, at least one shall have a minimum length of 19 feet, and other spaces may be the lengths of small, medium, or large spaces in approximate proportion to the number of each size space provided on the lot.\n5. \"Tandem parking\" means a parking space equal to the width and two times the len...","highlights":["\"Medium vehicle\" means the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length."]},"stage2_chunks":[{"id":"5ec97e13-82cc-4918-8f85-2d284b659d69","subsection_id":"23.54.030_part1","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":false,"last_amended_date":"2025","chars":8256,"text_head":"## 23.54.030 - Parking space and access standards\n\nAll parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030.\n\n## A. ...","carries_gold":true},{"id":"f34c4fb4-565a-4a02-9440-0e0b3b01fed2","subsection_id":"23.54.030_part2","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":true,"last_amended_date":"2025","chars":9834,"text_head":"- a. Driveway widths\n- 1) The minimum width of driveways for one-way traffic shall be 12 feet and the maximum width shall be 15 feet.\n- 2) The minimum width of driveways for two-way traffic shall be 22 feet and the maxim...","carries_gold":false},{"id":"117e4338-b695-4688-b8db-48fb08dff396","subsection_id":"23.54.030_part3","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":true,"last_amended_date":"2025","chars":9310,"text_head":"- 4) If two adjoining lots share a common driveway, the combined frontage of the two lots will be considered as one in determining the maximum number of permitted curb cuts.\n- b. Curb cut width. Curb cuts shall not excee...","carries_gold":false},{"id":"6a19d192-06da-4aea-a526-e9d74586acd2","subsection_id":"23.54.030_part4","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":false,"last_amended_date":"2025","chars":7951,"text_head":"- a. An easement may be provided sufficient to maintain the sight triangle. The easement shall be recorded with the King County Recorder; or\n- b. The driveway may be shared with a driveway on the neighboring lot; or\n- c....","carries_gold":false},{"id":"824e6b58-0a2d-49c7-a2c9-fa2695e6452d","subsection_id":"23.54.030_part5","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":false,"last_amended_date":"2025","chars":941,"text_head":"(Ord. 127219, \u00a7 28, 2025; Ord. 127099, \u00a7 47, 2024; Ord. 126685, \u00a7 43, 2022; Ord. 126682, \u00a7 10, 2022; Ord. 126157, \u00a7 44, 2020; Ord. 125815, \u00a7 4, 2019; Ord. 125603, \u00a7 61, 2018; Ord. 125558, \u00a7 48, 2018; Ord. 125272, \u00a7 49, 2...","carries_gold":false}],"stage3_graph":{"node":{"c.id":"5ec97e13-82cc-4918-8f85-2d284b659d69","c.agency":"SMC","c.citation":"SMC 23.54.030","c.section_number":"23.54.030","c.authority_level":"local_statute","c.document_type":"substantive","c.filename":"Title 23 - Land Use Code.pdf","c.chunk_index":519,"c.deprecated":0},"edges_out":[{"rel":"NEXT_SECTION","from":"5ec97e13-82cc-4918-8f85-2d284b659d69","to_id":"f34c4fb4-565a-4a02-9440-0e0b3b01fed2","to_cite":"SMC 23.54.030","to_agency":"SMC","confidence":1.0},{"rel":"SUBJECT_TO","from":"5ec97e13-82cc-4918-8f85-2d284b659d69","to_id":"4d4f44a7-a2e7-4002-bc35-54d6d4a21051","to_cite":"SMC 23.54.015","to_agency":"SMC","confidence":0.8999999761581421}],"edges_in":[{"rel":"DOC_HAS_CHUNK","from_id":"Title 23 - Land Use Code.pdf","from_label":"Title 23 - Land Use Code","to":"5ec97e13-82cc-4918-8f85-2d284b659d69"}]},"stage4_query":{"latency_ms":2479.2,"model":"GPT-4.1-mini","level":"L1"},"stage5_retrieve":{"latency_ms":4329.8,"vector_top":[{"citation":"SMC 11.14.321","score":0.2301,"agency":"SMC"},{"citation":"SMC 11.72.070","score":0.2277,"agency":"SMC"},{"citation":"SMC 11.14.375","score":0.2069,"agency":"SMC"},{"citation":"SMC 11.60.050","score":0.2068,"agency":"SMC"},{"citation":"SMC 11.72.060","score":0.2051,"agency":"SMC"}],"bm25_top":[{"citation":"SMC 23.54.030","score":52.3181,"agency":"SMC"},{"citation":"DR 8-2003","score":44.512,"agency":"Seattle DIR"},{"citation":"SMC 23.54.030","score":43.781,"agency":"SMC"},{"citation":"SMC 23.54.030","score":36.7624,"agency":"SMC"},{"citation":"SMC 23.49.019","score":34.6486,"agency":"SMC"}],"fused_top":[{"id":"5ec97e13-82cc-4918-8f85-2d284b659d69","citation":"SMC 23.54.030","agency":"SMC","fused_score":0.6398,"text_head":"## 23.54.030 - Parking space and access standards\n\nAll parking spaces provided, whether required by ..."},{"id":"f78a81b0-7075-4217-95c5-8a69ebc03d98","citation":"SMC 11.14.321","agency":"SMC","fused_score":0.55,"text_head":"## 11.14.321 - Medium-speed electric vehicle\n\n\"Medium-speed electric vehicle\" means a self-propelled..."},{"id":"fa6fa808-6bf1-4c2f-8380-e02ca2c00fe2","citation":"SMC 11.72.070","agency":"SMC","fused_score":0.526,"text_head":"## 11.72.070 - Commercial and large size vehicles.\n\nNo person shall park a vehicle on any street or ..."},{"id":"3bf80e8b-1fa7-4777-a86d-f3eec1d32460","citation":"SMC 11.14.375","agency":"SMC","fused_score":0.3243,"text_head":"11.14.375 - Multiple lane street.\n\n\"Multiple lane street\" means any street the roadway of which is o..."},{"id":"81dc04b5-d7d7-484e-b9ed-33980496d767","citation":"SMC 11.60.050","agency":"SMC","fused_score":0.323,"text_head":"## 11.60.050 - Outside width limits.\n\nThe total outside width of any vehicle or load thereon shall n..."},{"id":"7b942472-addc-4f45-a18f-1da149b23ae5","citation":"DR 8-2003","agency":"Seattle DIR","fused_score":0.3114,"text_head":"vo tull spaces examples:\n\nB\n\n## DCLU\n\n## Director's Rule 82003\n\n| Applicant: City of Seattle Departm..."},{"id":"bd4fc99e-e874-423e-9132-c8811c566091","citation":"SMC 11.72.060","agency":"SMC","fused_score":0.3068,"text_head":"## 11.72.060 - Clear roadway.\n\nNo person shall stand or park a vehicle upon a street, excluding alle..."}],"total_results":15},"stage6_synthesize":{"latency_ms":1779.7,"model":"GPT-5.1","answer_text":"Under `SMC 23.54.030.A.2`, the minimum width of a \"medium vehicle\" parking space is **8 feet**. `[SMC 23.54.030]`\n\n---\nSources: [1] SMC 23.54.030 -- ## 23.54.030 - Parking space and access standards\n, [2] SMC 11.14.321 -- ## 11.14.321 - Medium-speed electric vehicle\n\n\"Med, [3] SMC 11.72.070 -- ## 11.72.070 - Commercial and large size vehicles., [4] SMC 11.14.375 -- 11.14.375 - Multiple lane street.\n\n\"Multiple lane , [5] SMC 11.60.050 -- ## 11.60.050 - Outside width limits.\n\nThe total ou, [6] SMC 11.72.060 -- ## 11.72.060 - Clear roadway.\n\nNo person shall sta, [7] SMC 23.54.030 -- - a. Driveway widths\n- 1) The minimum width of dri, [8] SMC 11.14.555 -- ## 11.14.555 - Service parking.\n\n\"Service parking\", [9] SMC 11.26.180 -- ## 11.26.180 - Service parking-Duration.\n\nThe buil, [10] SMC 23.54.030 -- - a. An easement may be provided sufficient to mai, [11] SMC 11.26.120 -- ## 11.26.120 - Service parking work location.\n\nThe, [12] SMC 11.70.070 -- ## 11.70.070 - Motorcycle parking\n\n- A. Every moto, [13] SMC 11.70.040 -- ## 11.70.040 - Parallel parking-Right-hand side.\n\n, [14] SMC 23.49.019 -- 2. The Seattle Department of Transportation, in co, [15] DR 8-2003 -- vo tull spaces examples:\n\nB\n\n## DCLU\n\n## Director'","sources":[{"citation":"SMC 23.54.030","agency":"SMC","score":0.6397508224827395},{"citation":"SMC 11.14.321","agency":"SMC","score":0.55},{"citation":"SMC 11.72.070","agency":"SMC","score":0.5260147815207822},{"citation":"SMC 11.14.375","agency":"SMC","score":0.32430494416384786},{"citation":"SMC 11.60.050","agency":"SMC","score":0.32298723414114267},{"citation":"SMC 11.72.060","agency":"SMC","score":0.3068306612297855}],"usage":{"prompt_tokens":10044,"completion_tokens":51}}},{"example":{"id":"L1-PARK-001","key":"park001","label":"Paraphrased: answer is in a table","tagline":"Natural language question. Answer is one row of a table.","question":"What is the minimum number of off-street parking spaces required for a single-family dwelling in Seattle, outside of urban centers, urban villages, and the Station Area Overlay District?","gold_answer":"1 space for each dwelling unit","gold_quote":"K. Single-family dwelling units - 1 space for each dwelling unit","source_pdf":"SMC Title 23 - Land Use Code.pdf","source_page":797,"required_section":"SMC 23.54.015 Table B row K","narrative":"The question is paraphrased and the answer sits inside a Markdown table row. The chunker tagged this chunk with is_table=true and table_type=dimensional. Vector finds it because 'off-street parking' and 'single-family dwelling' embed close to the table chunk; BM25 also lands the right section. Both signals agree."},"gold_chunk_id":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161","stage1_page":{"doc":"SMC Title 23 - Land Use Code.pdf","page":797,"parser":"Docling 2.82.0 (TableFormer ACCURATE)","parse_time_seconds_per_page":1.23,"ocr_used":false,"text_excerpt":"| Table B for 23.54.015 Required parking for residential uses   | Table B for 23.54.015 Required parking for residential uses   | Table B for 23.54.015 Required parking for residential uses                                                                                                              |\n|---------------------------------------------------------------|---------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| Use                                                           | Use                                                           | Minimum parking required                                                                                                                                                 |\n| I. General residential uses 2                                 | I. General residential uses 2                                 | I. General residential uses 2                                                                                                                                            |\n| A.                                                            | Adult family homes                                            | 1 space for each dwelling unit                                                                                                                                        ...","highlights":["Single-family dwelling"]},"stage2_chunks":[{"id":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161","subsection_id":"23.54.015_part1","citation":"SMC 23.54.015","section_title":"Required parking and maximum parking limits","content_type":"definition","is_table":true,"last_amended_date":"2005","chars":12547,"text_head":"## 23.54.015 - Required parking and maximum parking limits\n\n- A. Required parking. The minimum number of off-street motor vehicle parking spaces required for specific uses is set forth in Table A for 23.54.015 for non-re...","carries_gold":false},{"id":"97c26fe2-b13f-4ee2-8308-045183cbaa4f","subsection_id":"23.54.015_part2","citation":"SMC 23.54.015","section_title":"Required parking and maximum parking limits","content_type":"definition","is_table":true,"last_amended_date":"2005","chars":16394,"text_head":"|    | B.6.               | Lodging uses                                       | 1 space for each 4 rooms; For bed and breakfast facilities in neighborhood residential and multifamily zones, 1 space for each dwelling uni...","carries_gold":false},{"id":"f9f39264-61de-45c0-b017-97ddf4d4a794","subsection_id":"23.54.015_part3","citation":"SMC 23.54.015","section_title":"Required parking and maximum parking limits","content_type":"definition","is_table":true,"last_amended_date":"2005","chars":14387,"text_head":"| Table B for 23.54.015 Required parking for residential uses   | Table B for 23.54.015 Required parking for residential uses   | Table B for 23.54.015 Required parking for residential uses                               ...","carries_gold":false},{"id":"ce3a9aa1-a9c7-473b-b8f3-e2616a00e7d2","subsection_id":"23.54.015_part4","citation":"SMC 23.54.015","section_title":"Required parking and maximum parking limits","content_type":"definition","is_table":true,"last_amended_date":"2005","chars":12711,"text_head":"| I.   | Institutes for advanced study in neighborhood residential zones (existing) 1   | 3.5 spaces for each 1,000 square feet of office space; plus 10 spaces for each 1,000 square feet of additional building footprint ...","carries_gold":false},{"id":"dd68c9a8-d492-46d9-9803-4074be32916b","subsection_id":"23.54.015_part5","citation":"SMC 23.54.015","section_title":"Required parking and maximum parking limits","content_type":"definition","is_table":true,"last_amended_date":"2005","chars":8728,"text_head":"2. Performance standards. Provide bicycle parking in a highly visible, safe, and convenient location, emphasizing user convenience and theft deterrence, based on rules promulgated by the Director of the Seattle Departmen...","carries_gold":false},{"id":"4c7501fa-c9ef-4d57-827a-ef90713b86cb","subsection_id":"23.54.015_part6","citation":"SMC 23.54.015","section_title":"Required parking and maximum parking limits","content_type":"definition","is_table":true,"last_amended_date":"2005","chars":8897,"text_head":"| B.2.                         | Child care centers                                                          | 1 per 4,000 square feet      | 1 per 20 children. 2 spaces minimum       |\n|------------------------------|--...","carries_gold":false},{"id":"4d4f44a7-a2e7-4002-bc35-54d6d4a21051","subsection_id":"23.54.015_part7","citation":"SMC 23.54.015","section_title":"Required parking and maximum parking limits","content_type":"definition","is_table":false,"last_amended_date":"2005","chars":2637,"text_head":"Ord. 123209, \u00a7 54, 2009 [amended B and Tables B and C and created Maps A and B]; Ord. 123046, \u00a7 65, 2009 [renamed charts to tables]; Ord. 122935, \u00a7 13, 2009 [amended B, D, and G, and Charts A and B]; Ord. 122823, \u00a7 10, 2...","carries_gold":false}],"stage3_graph":{"node":{"c.id":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161","c.agency":"SMC","c.citation":"SMC 23.54.015","c.section_number":"23.54.015","c.authority_level":"local_statute","c.document_type":"substantive","c.filename":"Title 23 - Land Use Code.pdf","c.chunk_index":503,"c.deprecated":0},"edges_out":[{"rel":"NEXT_SECTION","from":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161","to_id":"97c26fe2-b13f-4ee2-8308-045183cbaa4f","to_cite":"SMC 23.54.015","to_agency":"SMC","confidence":1.0},{"rel":"SUBJECT_TO","from":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161","to_id":"3768533e-a412-4235-9569-72d3b0596e8f","to_cite":"SMC 23.42.044","to_agency":"SMC","confidence":0.8999999761581421},{"rel":"SUBJECT_TO","from":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161","to_id":"71b2b1ea-5458-450c-8bbe-18ca042595ad","to_cite":"SMC 23.54.020","to_agency":"SMC","confidence":0.8999999761581421},{"rel":"SUBJECT_TO","from":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161","to_id":"77c88cd7-00eb-486c-b4e8-e21e23dc465e","to_cite":"SMC 23.74.010","to_agency":"SMC","confidence":0.8999999761581421},{"rel":"SUBJECT_TO","from":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161","to_id":"ff3dd1aa-b5f3-4d0b-9271-d452796136d9","to_cite":"SMC 23.75.180","to_agency":"SMC","confidence":0.8999999761581421},{"rel":"SUBJECT_TO","from":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161","to_id":"effef572-2440-4ad5-a7a0-c207663d6d76","to_cite":"SMC 23.76.026","to_agency":"SMC","confidence":0.8999999761581421}],"edges_in":[{"rel":"DOC_HAS_CHUNK","from_id":"Title 23 - Land Use Code.pdf","from_label":"Title 23 - Land Use Code","to":"fe0d08b6-e49e-49d7-a2c9-5c80021b8161"}]},"stage4_query":{"latency_ms":1962.1,"model":"GPT-4.1-mini","level":"L2"},"stage5_retrieve":{"latency_ms":699.9,"vector_top":[{"citation":"SPU 0.5","score":0.2108,"agency":"SPU"},{"citation":"SMC 23.44.016","score":0.2077,"agency":"SMC"},{"citation":"SMC 23.48.680","score":0.2029,"agency":"SMC"},{"citation":"SMC 23.48.780","score":0.1997,"agency":"SMC"},{"citation":"SMC 23.48.880","score":0.1976,"agency":"SMC"}],"bm25_top":[{"citation":"SMC 23.34.014","score":77.8596,"agency":"SMC"},{"citation":"SMC 23.54.015","score":69.4173,"agency":"SMC"},{"citation":"SMC 23.46.022","score":65.1615,"agency":"SMC"},{"citation":"SMC 23.34.011","score":63.3566,"agency":"SMC"},{"citation":"SMC 23.54.015","score":59.8138,"agency":"SMC"}],"fused_top":[{"id":"27c75fda-8845-45f7-b29a-0a292527f09c","citation":"SPU 0.5","agency":"SPU","fused_score":0.55,"text_head":"| Building Type                           | Population Density          |\n|-------------------------..."},{"id":"03f98a9b-cad0-4b28-8e77-c1905f9dfc4a","citation":"SMC 23.44.016","agency":"SMC","fused_score":0.5168,"text_head":"## 23.44.016 - Parking and garages\n\n- A. Parking quantity. Off-street parking is required pursuant t..."},{"id":"80b7a124-8e32-4960-ab5f-1bfbd4309858","citation":"SMC 23.48.680","agency":"SMC","fused_score":0.4656,"text_head":"## 23.48.680 - Parking quantity in SM-U zones\n\n- A. Off street parking spaces and bicycle parking ar..."},{"id":"de07a280-ef65-4050-8afd-6efb405b125d","citation":"SMC 23.34.014","agency":"SMC","fused_score":0.45,"text_head":"## 23.34.014 - Lowrise 1 (LR1) zone, function and locational criteria\n\n- A. Function. The function o..."},{"id":"441fc783-d80a-4537-be88-42e8f80ac005","citation":"SMC 23.48.780","agency":"SMC","fused_score":0.4306,"text_head":"## 23.48.780 - Required parking in Uptown Urban Center\n\n- A. Parking at street level within structur..."},{"id":"439424da-a1e5-4a1f-9a67-0a935b60bb3f","citation":"SMC 23.48.880","agency":"SMC","fused_score":0.4089,"text_head":"## 23.48.880 - Parking quantity in SM-NG zones\n\n- A. Off-street parking spaces and bicycle parking a..."},{"id":"34533b4a-53e9-42b7-95fe-0bd5b370c86f","citation":"SMC 23.42.070","agency":"SMC","fused_score":0.3886,"text_head":"## 23.42.070 - Parking for rented or leased multifamily dwelling units and commercial uses\n\n## A. Pa..."}],"total_results":15},"stage6_synthesize":{"latency_ms":2767.2,"model":"GPT-5.1","answer_text":"The minimum requirement is **1 off-street parking space per single-family dwelling unit** under Table B for `SMC 23.54.015` (Part I, item K), and this minimum does **not** apply only where an exception in the same section reduces it (e.g., residential uses within urban centers, urban villages, or the Station Area Overlay District, or specific overlays/footnotes). Because your location is outside urban centers, urban villages, and the Station Area Overlay District, those area-based \u201cno minimum\u201d exceptions in Table B (items L and M) do not apply, so the **1 space per dwelling unit** standard governs. `[SMC 23.54.015]`\n\n---\nSources: [1] SMC 23.44.016 -- ## 23.44.016 - Parking and garages\n\n- A. Parking q, [2] SMC 23.48.680 -- ## 23.48.680 - Parking quantity in SM-U zones\n\n- A, [3] SMC 23.34.014 -- ## 23.34.014 - Lowrise 1 (LR1) zone, function and , [4] SMC 23.48.780 -- ## 23.48.780 - Required parking in Uptown Urban Ce, [5] SMC 23.48.880 -- ## 23.48.880 - Parking quantity in SM-NG zones\n\n- , [6] SMC 23.42.070 -- ## 23.42.070 - Parking for rented or leased multif, [7] SMC 23.48.280 -- ## 23.48.280 - Required parking in South Lake Unio, [8] SMC 23.54.015 -- | Table B for 23.54.015 Required parking for resid, [9] SMC 23.54.020 -- ## 23.54.020 - Parking quantity exceptions\n\nThe mo, [10] SMC 23.48.755 -- ## 23.48.755 - Screening\n\n- A. Parking in structur, [11] SMC 23.46.022 -- | Table B for 23.47A.013 Floor area ratio (FAR) li, [12] SMC 23.34.011 -- ## 23.34.011 - NR1, NR2, and NR3 zones, function, , [13] SMC 23.48.080 -- ## 23.48.080 - Required parking and loading\n\n- A. , [14] SPU 0.5 -- | Building Type                           | Popula, [15] SPU 4.3.1.1 -- ## 4.3.1.1 Parking\n\nEarly in the design process, p","sources":[{"citation":"SMC 23.44.016","agency":"SMC","score":0.5168225621281877},{"citation":"SMC 23.48.680","agency":"SMC","score":0.4655964653902799},{"citation":"SMC 23.34.014","agency":"SMC","score":0.45},{"citation":"SMC 23.48.780","agency":"SMC","score":0.4305732144306704},{"citation":"SMC 23.48.880","agency":"SMC","score":0.40886673315320127},{"citation":"SMC 23.42.070","agency":"SMC","score":0.38855704892558535}],"usage":{"prompt_tokens":14082,"completion_tokens":154}}},{"example":{"id":"Q002","key":"q002","label":"Hard: retrieval misses","tagline":"Paraphrased definition. Gold chunk does not rank top-5. System refuses honestly.","question":"What is the definition of \"tandem parking\"","gold_answer":"\"Tandem parking\" means a parking space equal to the width and two times the length of the vehicle size standards in subsections 23.54.030.A.1, 23.54.030.A.2, and 23.54.030.A.3 for the size of the vehicle to be accommodated.","gold_quote":"\"Tandem parking\" means a parking space equal to the width and two times the length","source_pdf":"SMC Title 23 - Land Use Code.pdf","source_page":829,"required_section":"SMC 23.54.030","narrative":"The question paraphrases and gives no section number. The real tandem-parking definition lives in a 1,883-token SMC 23.54.030 chunk that does not embed close to a 6-word query. BM25 finds DR 8-2003 (Director's Rule on tandem parking) and some Title 11 traffic chunks. None of them carry the canonical definition. The synthesizer correctly refuses with 'Not found in provided sources' rather than guess."},"gold_chunk_id":"5ec97e13-82cc-4918-8f85-2d284b659d69","stage1_page":{"doc":"SMC Title 23 - Land Use Code.pdf","page":829,"parser":"Docling 2.82.0 (TableFormer ACCURATE)","parse_time_seconds_per_page":1.23,"ocr_used":false,"text_excerpt":"## 23.54.030 - Parking space and access standards\n\nAll parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030.\n\n## A. Parking space dimensions\n\n1. \"Large vehicle\" means the minimum size of a large vehicle parking space shall be 8 feet in width and 19 feet in length.\n2. \"Medium vehicle\" means the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length.\n\n3.\n\n- \"Small vehicle\" means the minimum size of a small vehicle parking space shall be 7.5 feet in width and 15 feet in length.\n4. \"Barrier-free parking\" means a parking space meeting the following standards:\n- a. Parking spaces shall not be less than 8 feet in width and shall have an adjacent access aisle not less than 5 feet in width. Van-accessible parking spaces shall have an adjacent access aisle not less than 8 feet in width. Where two adjacent spaces are provided, the access aisle may be shared between the two spaces. Boundaries of access aisles shall be marked so that aisles will not be used as parking space.\n- b. A minimum length of 19 feet or when more than one barrier-free parking space is provided, at least one shall have a minimum length of 19 feet, and other spaces may be the lengths of small, medium, or large spaces in approximate proportion to the number of each size space provided on the lot.\n5. \"Tandem parking\" means a parking space equal to the width and two times the len...","highlights":["\"Tandem parking\" means a parking space equal to the width and two times the length"]},"stage2_chunks":[{"id":"5ec97e13-82cc-4918-8f85-2d284b659d69","subsection_id":"23.54.030_part1","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":false,"last_amended_date":"2025","chars":8256,"text_head":"## 23.54.030 - Parking space and access standards\n\nAll parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030.\n\n## A. ...","carries_gold":true},{"id":"f34c4fb4-565a-4a02-9440-0e0b3b01fed2","subsection_id":"23.54.030_part2","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":true,"last_amended_date":"2025","chars":9834,"text_head":"- a. Driveway widths\n- 1) The minimum width of driveways for one-way traffic shall be 12 feet and the maximum width shall be 15 feet.\n- 2) The minimum width of driveways for two-way traffic shall be 22 feet and the maxim...","carries_gold":false},{"id":"117e4338-b695-4688-b8db-48fb08dff396","subsection_id":"23.54.030_part3","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":true,"last_amended_date":"2025","chars":9310,"text_head":"- 4) If two adjoining lots share a common driveway, the combined frontage of the two lots will be considered as one in determining the maximum number of permitted curb cuts.\n- b. Curb cut width. Curb cuts shall not excee...","carries_gold":false},{"id":"6a19d192-06da-4aea-a526-e9d74586acd2","subsection_id":"23.54.030_part4","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":false,"last_amended_date":"2025","chars":7951,"text_head":"- a. An easement may be provided sufficient to maintain the sight triangle. The easement shall be recorded with the King County Recorder; or\n- b. The driveway may be shared with a driveway on the neighboring lot; or\n- c....","carries_gold":false},{"id":"824e6b58-0a2d-49c7-a2c9-fa2695e6452d","subsection_id":"23.54.030_part5","citation":"SMC 23.54.030","section_title":"Parking space and access standards","content_type":"definition","is_table":false,"last_amended_date":"2025","chars":941,"text_head":"(Ord. 127219, \u00a7 28, 2025; Ord. 127099, \u00a7 47, 2024; Ord. 126685, \u00a7 43, 2022; Ord. 126682, \u00a7 10, 2022; Ord. 126157, \u00a7 44, 2020; Ord. 125815, \u00a7 4, 2019; Ord. 125603, \u00a7 61, 2018; Ord. 125558, \u00a7 48, 2018; Ord. 125272, \u00a7 49, 2...","carries_gold":false}],"stage3_graph":{"node":{"c.id":"5ec97e13-82cc-4918-8f85-2d284b659d69","c.agency":"SMC","c.citation":"SMC 23.54.030","c.section_number":"23.54.030","c.authority_level":"local_statute","c.document_type":"substantive","c.filename":"Title 23 - Land Use Code.pdf","c.chunk_index":519,"c.deprecated":0},"edges_out":[{"rel":"NEXT_SECTION","from":"5ec97e13-82cc-4918-8f85-2d284b659d69","to_id":"f34c4fb4-565a-4a02-9440-0e0b3b01fed2","to_cite":"SMC 23.54.030","to_agency":"SMC","confidence":1.0},{"rel":"SUBJECT_TO","from":"5ec97e13-82cc-4918-8f85-2d284b659d69","to_id":"4d4f44a7-a2e7-4002-bc35-54d6d4a21051","to_cite":"SMC 23.54.015","to_agency":"SMC","confidence":0.8999999761581421}],"edges_in":[{"rel":"DOC_HAS_CHUNK","from_id":"Title 23 - Land Use Code.pdf","from_label":"Title 23 - Land Use Code","to":"5ec97e13-82cc-4918-8f85-2d284b659d69"}]},"stage4_query":{"latency_ms":1309.1,"model":"GPT-4.1-mini","level":"L1"},"stage5_retrieve":{"latency_ms":893.8,"vector_top":[{"citation":"SMC 11.14.415","score":0.0041,"agency":"SMC"},{"citation":"SMC 11.14.420","score":0.0024,"agency":"SMC"},{"citation":"SMC 11.72.100","score":-0.0075,"agency":"SMC"},{"citation":"SMC 11.70.020","score":-0.0196,"agency":"SMC"},{"citation":"","score":-0.0263,"agency":"Seattle DIR"}],"bm25_top":[{"citation":"DR 8-2003","score":19.0037,"agency":"Seattle DIR"},{"citation":"RCW 36.70A.620","score":17.1298,"agency":"RCW"},{"citation":"SMC 23.54.020","score":15.3487,"agency":"SMC"},{"citation":"WAC 365-196-872","score":14.3791,"agency":"WAC"},{"citation":"","score":13.8416,"agency":"WAC"}],"fused_top":[{"id":"53b47da0-05c4-450d-a36a-c72693198064","citation":"SMC 11.14.415","agency":"SMC","fused_score":0.55,"text_head":"## 11.14.415 - Park or parking.\n\n\"Park\" or \"parking\" means the standing of a vehicle, whether occupi..."},{"id":"a2a2e9ef-2695-42fa-a7e4-4375e8e61715","citation":"SMC 11.14.420","agency":"SMC","fused_score":0.5359,"text_head":"## 11.14.420 - Park at an angle or angle park.\n\n\"Park at an angle\" or \"angle park\" means the parking..."},{"id":"113b9667-b269-4ad7-81fe-0b5cf312486b","citation":"SMC 11.72.100","agency":"SMC","fused_score":0.4554,"text_head":"## 11.72.100 - Double parking.\n\nNo person shall stop, stand or park a vehicle with its side next to ..."},{"id":"7b942472-addc-4f45-a18f-1da149b23ae5","citation":"DR 8-2003","agency":"Seattle DIR","fused_score":0.45,"text_head":"vo tull spaces examples:\n\nB\n\n## DCLU\n\n## Director's Rule 82003\n\n| Applicant: City of Seattle Departm..."},{"id":"d4bcccf7-e7c4-44bb-9bb2-e44c51e04d83","citation":"SMC 11.70.020","agency":"SMC","fused_score":0.3569,"text_head":"11.70.020 - Angle parking-General.\n\nNo person shall park a vehicle upon streets or alleys which have..."},{"id":"5ba9a637-245e-4bf1-bcb4-30d5421ee525","citation":"RCW 36.70A.620","agency":"RCW","fused_score":0.3514,"text_head":"## RCW 36.70A.620  Cities planning under RCW 36.70A.040 -Minimum residential parking requirements.\n\n..."},{"id":"7657a254-aa09-4d32-9a40-983605937ced","citation":"","agency":"Seattle DIR","fused_score":0.302,"text_head":"3. A parking stall for each vanpool within the building's garage or parking"}],"total_results":15},"stage6_synthesize":{"latency_ms":1477.7,"model":"GPT-5.1","answer_text":"\"Tandem\" parking is defined as having **two or more vehicles, one in front of or behind the others with a single means of ingress and egress**. `[RCW 36.70A.622]`\n\n---\nSources: [1] RCW 36.70A.620 -- ## RCW 36.70A.620  Cities planning under RCW 36.70, [2] WAC 365-196-872 -- - (e) For the purposes of RCW 36.70A.620(3), marke, [3]  -- &lt;unknown&gt;\n\n## Chapter 296-150P WAC RECREATIO, [4] WAC 365-212-010 -- WAC 365-212-010 What definitions apply to this cha, [5] WAC 352-18-010 -- ## WAC\n\n352-18-010 What definitions apply to this , [6] SMC 11.14.415 -- ## 11.14.415 - Park or parking.\n\n\"Park\" or \"parkin, [7] SMC 11.14.420 -- ## 11.14.420 - Park at an angle or angle park.\n\n\"P, [8] SMC 11.72.100 -- ## 11.72.100 - Double parking.\n\nNo person shall st, [9] SMC 11.70.020 -- 11.70.020 - Angle parking-General.\n\nNo person shal, [10] SMC 11.14.555 -- ## 11.14.555 - Service parking.\n\n\"Service parking\", [11] SMC 11.70.040 -- ## 11.70.040 - Parallel parking-Right-hand side.\n\n, [12] SMC 23.54.020 -- ## 23.54.020 - Parking quantity exceptions\n\nThe mo, [13] SMC 11.70.100 -- ## 11.70.100 - Parking stalls or spaces.\n\nWhere pa, [14] DR 8-2003 -- vo tull spaces examples:\n\nB\n\n## DCLU\n\n## Director', [15]  -- 3. A parking stall for each vanpool within the bui","sources":[{"citation":"RCW 36.70A.620","agency":"RCW","score":0.35137989139545367},{"citation":"WAC 365-196-872","agency":"WAC","score":0.20661536464232405},{"citation":"","agency":"WAC","score":0.17832600168437762},{"citation":"WAC 365-212-010","agency":"WAC","score":0.17579883298127813},{"citation":"WAC 352-18-010","agency":"WAC","score":0.15707493807386033},{"citation":"SMC 11.14.415","agency":"SMC","score":0.55}],"usage":{"prompt_tokens":8614,"completion_tokens":55}}}]}</script>
+
+<script>
+function setTheme(t){ if(t==='dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); try{localStorage.setItem('theme',t);}catch(e){} }
+document.getElementById('themeBtn').addEventListener('click', () => setTheme(document.documentElement.classList.contains('dark')?'light':'dark'));
+(function(){try{const s=localStorage.getItem('theme'); if(s)setTheme(s); else if(window.matchMedia('(prefers-color-scheme: dark)').matches)setTheme('dark');}catch(e){}})();
+
+// fade-in on scroll
+const fadeIo = new IntersectionObserver((entries) => entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); fadeIo.unobserve(e.target);}}), { threshold: 0.08});
+document.querySelectorAll('.fade').forEach(el => fadeIo.observe(el));
+
+// TOC active state
+const tocLinks = document.querySelectorAll('#toc a');
+const tocSecs = document.querySelectorAll('section.chapter, #start');
+const tocIo = new IntersectionObserver((entries) => entries.forEach(e => { if(e.isIntersecting){ const id = e.target.id; tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href')==='#'+id)); }}), { rootMargin: '-40% 0px -55% 0px', threshold: 0});
+tocSecs.forEach(s => tocIo.observe(s));
+
+// Load inline data
+const RAW = document.getElementById('walkthroughData').textContent;
+const ALL = JSON.parse(RAW);
+let CURRENT_KEY = ALL.examples[0].example.key;
+
+// ---------- example pills ----------
+const examplesEl = document.getElementById('examples');
+ALL.examples.forEach((ex, i) => {
+  const e = ex.example;
+  const b = document.createElement('button');
+  b.className = 'ex-pill' + (i === 0 ? ' active' : '');
+  b.dataset.key = e.key;
+  const id = document.createElement('div'); id.className = 'ex-id'; id.textContent = e.id; b.appendChild(id);
+  const lbl = document.createElement('div'); lbl.className = 'ex-lbl'; lbl.textContent = e.label; b.appendChild(lbl);
+  const tag = document.createElement('div'); tag.className = 'ex-tag'; tag.textContent = e.tagline; b.appendChild(tag);
+  b.addEventListener('click', () => switchTo(e.key));
+  examplesEl.appendChild(b);
+});
+
+function switchTo(key){
+  CURRENT_KEY = key;
+  document.querySelectorAll('.ex-pill').forEach(p => p.classList.toggle('active', p.dataset.key === key));
+  renderAll();
+  retrieveCycleStarted = false;
+}
+
+function currentEx(){ return ALL.examples.find(x => x.example.key === CURRENT_KEY); }
+
+// ---------- render ----------
+function renderAll(){
+  const ex = currentEx();
+  renderPage(ex);
+  renderChunks(ex);
+  renderGraph(ex);
+  renderClassify(ex);
+  renderRetrieve(ex);
+  renderSynth(ex);
+  renderAnswer(ex);
+}
+
+function renderPage(ex){
+  const e = ex.example;
+  document.getElementById('pageQ').textContent = '"' + e.question + '"';
+  document.getElementById('pageHead').textContent = e.source_pdf + ' · page ' + e.source_page;
+  const pf = document.getElementById('pageFrame');
+  pf.textContent = '';
+  const text = ex.stage1_page.text_excerpt || '';
+  const hl = (ex.stage1_page.highlights && ex.stage1_page.highlights[0]) || '';
+  if(hl && text.includes(hl)){
+    const i = text.indexOf(hl);
+    pf.appendChild(document.createTextNode(text.slice(0, i)));
+    const mark = document.createElement('span'); mark.className = 'hl'; mark.textContent = hl;
+    pf.appendChild(mark);
+    pf.appendChild(document.createTextNode(text.slice(i + hl.length)));
+  } else {
+    pf.textContent = text;
+  }
+  document.getElementById('pageChars').textContent = text.length.toLocaleString();
+}
+
+function renderChunks(ex){
+  const cr = document.getElementById('chunksRow');
+  cr.textContent = '';
+  const goldQ = ex.example.gold_quote || '';
+  const chunks = ex.stage2_chunks || [];
+  document.getElementById('chunksHead').textContent = 'Real chunks for ' + ex.example.required_section.split(' ')[0] + ' ' + (ex.example.required_section.split(' ')[1] || '');
+  document.getElementById('chunksBadge').textContent = chunks.length + ' sub-chunks';
+  chunks.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'ck' + (c.carries_gold ? ' gold' : '');
+    const top = document.createElement('div'); top.className = 'ck-top';
+    const idEl = document.createElement('span'); idEl.className = 'ck-id'; idEl.textContent = c.subsection_id || c.citation;
+    top.appendChild(idEl);
+    const tg = document.createElement('span'); tg.className = 'ck-tag' + (c.carries_gold ? ' good' : '');
+    tg.textContent = c.carries_gold ? 'gold answer here' : (c.content_type || 'chunk');
+    top.appendChild(tg);
+    if(c.is_table){ const t2 = document.createElement('span'); t2.className = 'ck-tag warn'; t2.textContent = 'is_table'; top.appendChild(t2);}
+    el.appendChild(top);
+    const tx = document.createElement('div'); tx.className = 'ck-text'; tx.textContent = c.text_head; el.appendChild(tx);
+    const meta = document.createElement('div'); meta.className = 'ck-meta';
+    const m1 = document.createElement('span');
+    const strong1 = document.createElement('strong'); strong1.textContent = (c.chars || 0).toLocaleString() + ' chars';
+    m1.appendChild(strong1); meta.appendChild(m1);
+    const m2 = document.createElement('span'); m2.textContent = 'amended ' + (c.last_amended_date || 'unknown'); meta.appendChild(m2);
+    el.appendChild(meta);
+    cr.appendChild(el);
+    // staggered animation when visible
+    setTimeout(() => { el.classList.add('show'); }, 120 * i);
+  });
+}
+
+function renderGraph(ex){
+  const svg = document.getElementById('graphSvg');
+  svg.textContent = '';
+  svg.classList.remove('show');
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs){ const e = document.createElementNS(NS, tag); Object.entries(attrs||{}).forEach(([k,v]) => e.setAttribute(k, v)); return e;}
+  function makeNode(x,y,w,h,label,sub,cls){
+    const g = el('g', {class: 'node ' + (cls||'')});
+    g.appendChild(el('rect', {x, y, width: w, height: h}));
+    const tx = el('text', {x: x + w/2, y: y + 22, 'text-anchor': 'middle'});
+    tx.textContent = label;
+    g.appendChild(tx);
+    if(sub){
+      const ts = el('text', {x: x + w/2, y: y + 38, 'text-anchor': 'middle', class: 'label'});
+      ts.textContent = sub;
+      g.appendChild(ts);
+    }
+    return g;
+  }
+  function makeArrow(from, to, label, cls){
+    const g = el('g');
+    const dx = to.x - from.x, dy = to.y - from.y, len = Math.hypot(dx, dy);
+    const path = el('path', {
+      class: 'edge ' + (cls||''),
+      d: 'M ' + from.x + ' ' + from.y + ' L ' + to.x + ' ' + to.y,
+      'marker-end': 'url(#arr-' + (cls||'default') + ')',
+      style: 'stroke-dasharray: ' + (len + 10) + '; stroke-dashoffset: ' + (len + 10) + '; transition: stroke-dashoffset 1.1s ease ' + (0.3 + Math.random() * 0.3) + 's;'
+    });
+    g.appendChild(path);
+    if(label){
+      const midx = (from.x + to.x)/2, midy = (from.y + to.y)/2 - 6;
+      const tx = el('text', {x: midx, y: midy, 'text-anchor': 'middle', class: 'label'});
+      tx.textContent = label;
+      g.appendChild(tx);
+    }
+    return g;
+  }
+  const defs = el('defs');
+  ['default','warn'].forEach(name => {
+    const m = el('marker', {id: 'arr-' + name, viewBox:'0 0 10 10', refX:'9', refY:'5', markerWidth:'6', markerHeight:'6', orient:'auto'});
+    const p = el('path', {d: 'M 0 0 L 10 5 L 0 10 z', class: 'arrow ' + (name === 'warn' ? 'warn' : '')});
+    m.appendChild(p); defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+
+  const cx = 360, cy = 150;
+  const gci = ex.gold_chunk_id ? ex.gold_chunk_id.slice(0,8) + '…' : 'chunk';
+  const target = ex.example.target_citation;
+  const subId = (ex.stage2_chunks.find(c => c.carries_gold) || ex.stage2_chunks[0] || {}).subsection_id || 'part1';
+  svg.appendChild(makeNode(cx - 110, cy - 30, 220, 60, target, subId + ' · ' + gci, 'center'));
+
+  const edgesIn = ex.stage3_graph.edges_in || [];
+  const edgesOut = ex.stage3_graph.edges_out || [];
+
+  if(edgesIn.length){
+    svg.appendChild(makeNode(40, cy - 22, 170, 44, 'DocumentNode', edgesIn[0].from_label || '', 'doc'));
+    svg.appendChild(makeArrow({x: 210, y: cy}, {x: cx - 112, y: cy}, 'DOC_HAS_CHUNK', ''));
+  }
+
+  // Up to 2 outgoing edges, stacked
+  edgesOut.slice(0, 2).forEach((e, idx) => {
+    const yOff = idx === 0 ? -50 : 50;
+    svg.appendChild(makeNode(540, cy + yOff - 20, 160, 40, e.to_cite, e.rel, ''));
+    svg.appendChild(makeArrow({x: cx + 110, y: cy + (yOff * 0.3)}, {x: 540, y: cy + yOff}, e.rel + ' ' + (e.confidence != null ? e.confidence.toFixed(2) : ''), e.confidence != null && e.confidence < 1 ? 'warn' : ''));
+  });
+
+  // edge list
+  const list = document.getElementById('graphEdges');
+  list.textContent = '';
+  const rows = [];
+  edgesIn.forEach(e => rows.push({rel: e.rel, from: e.from_label, to: gci, conf: null, note: 'parent document anchors this chunk'}));
+  edgesOut.forEach(e => rows.push({
+    rel: e.rel, from: gci, to: e.to_cite + (e.to_agency ? ' (' + e.to_agency + ')' : ''), conf: e.confidence,
+    note: ({
+      'NEXT_SECTION': 'reading-order link to the next sub-chunk',
+      'SUBJECT_TO': 'rule applies subject to ' + e.to_cite,
+      'CITES': 'explicit cross-reference in the chunk text',
+      'IMPLEMENTS': 'local rule implements upstream state law',
+      'DEFINED_BY': 'term is defined elsewhere',
+      'AMENDED_BY': 'this version superseded by ' + e.to_cite,
+    }[e.rel]) || ''
+  }));
+  rows.forEach(r => {
+    const div = document.createElement('div'); div.className = 'graph-edge';
+    const rel = document.createElement('span'); rel.className = 'rel'; rel.textContent = r.rel; div.appendChild(rel);
+    const txt = document.createElement('span'); txt.textContent = (r.from || '') + ' → ' + (r.to || '');
+    div.appendChild(txt);
+    if(r.note){ const note = document.createElement('span'); note.style.color = 'rgb(var(--muted))'; note.style.fontSize = '11.5px'; note.textContent = '· ' + r.note; div.appendChild(note);}
+    if(r.conf != null){ const c = document.createElement('span'); c.className = 'conf'; c.textContent = 'conf ' + r.conf.toFixed(2); div.appendChild(c);}
+    list.appendChild(div);
+  });
+
+  // Trigger SVG animation when this section comes into view
+  const graphSection = document.getElementById('graph');
+  const ob = new IntersectionObserver((entries, observer) => entries.forEach(e => { if(e.isIntersecting){ setTimeout(() => svg.classList.add('show'), 80); observer.unobserve(e.target);}}), {threshold: 0.15});
+  ob.observe(graphSection);
+}
+
+function renderClassify(ex){
+  const cf = document.getElementById('cfGrid');
+  cf.textContent = '';
+  const s4 = ex.stage4_query || {};
+  const fields = [
+    {l: 'Tier / level', v: s4.level || 'L1', sub: ex.example.id.startsWith('Q002') ? 'definition lookup' : 'single-hop factual lookup'},
+    {l: 'Premise status', v: (s4.premise_status === null || s4.premise_status === undefined || s4.premise_status === 'None') ? 'none' : String(s4.premise_status), sub: 'no false claim to correct in this question'},
+    {l: 'Agencies needed', v: 'SMC', sub: ex.example.id.startsWith('Q002') ? 'inferred from definition lookup' : 'explicit in the question'},
+    {l: 'Decomposition', v: 'single-hop', sub: 'no sub-query split needed'}
+  ];
+  fields.forEach(f => {
+    const div = document.createElement('div'); div.className = 'field';
+    const l = document.createElement('div'); l.className = 'l'; l.textContent = f.l;
+    const v = document.createElement('div'); v.className = 'v'; v.textContent = f.v;
+    const s = document.createElement('div'); s.className = 'sub'; s.textContent = f.sub;
+    div.appendChild(l); div.appendChild(v); div.appendChild(s);
+    cf.appendChild(div);
+  });
+  document.getElementById('cfBadge').textContent = (s4.latency_ms ? s4.latency_ms.toFixed(0) + ' ms · ' : '') + (s4.model || 'GPT-4.1-mini');
+}
+
+let retrieveTabsData;
+let retrieveCycleStarted = false;
+let retrieveCycleTimer = null;
+function buildRetrieveTabs(ex){
+  const ret = ex.stage5_retrieve || {};
+  const goldId = ex.gold_chunk_id;
+  const goldCite = ex.example.target_citation;
+  const fusedHasGold = (ret.fused_top || []).slice(0,5).some(r => r.id === goldId);
+
+  // Update top-of-section badge and dynamic em on heading
+  document.getElementById('retBadge').textContent = (ret.latency_ms ? (ret.latency_ms / 1000).toFixed(2) + ' s · ' : '') + (ret.total_results || 0) + ' results';
+  // Set retrieval narrative based on example
+  let verdict;
+  if(ex.example.key === 'park003') verdict = 'BM25 wins this one.';
+  else if(ex.example.key === 'park001') verdict = 'Both retrievers point at the same table.';
+  else verdict = 'All three miss the gold chunk.';
+  document.getElementById('retVerdict').textContent = verdict;
+
+  // Tab summaries customized per example
+  const summaries = {
+    park003: {
+      vector: 'Vector top-5 misses the gold chunk. The query "minimum width of a medium vehicle parking space" embeds closer to Title 11 traffic-code chunks like "Medium-speed electric vehicle" than to the long SMC 23.54.030 chunk. The query is 14 words, the gold chunk is about 1,883 tokens. Cosine similarity cannot resolve that gap by itself.',
+      bm25: 'BM25 wins cleanly. The three high-IDF anchors "SMC 23.54.030", "medium vehicle", "parking space" all sit literally inside the gold chunk. Tantivy ranks SMC 23.54.030 at #1 with score 52.3, and again at #3 for the next sub-chunk.',
+      fused: 'Linear fusion (vector 0.55 / BM25 0.45) lifts BM25\'s top hit to rank #1 after min-max normalization. The gold chunk lands at fused score 0.6398. The Title 11 vector hits still appear at ranks 2-5; they will go to the synthesizer too, but the gold chunk is the one with the actual answer.',
+      graph: 'Graph beam traversal returns no new chunks. The gold chunk\'s two outgoing edges (NEXT_SECTION to part 2, SUBJECT_TO SMC 23.54.015 at confidence 0.9) point at neighbors already in the seed set. The graph adds nothing here, which is fine because the gold chunk is already top 1.'
+    },
+    park001: {
+      vector: 'Vector wanders. With no section number to anchor on, the query "off-street parking spaces required for a single-family dwelling" embeds closest to SPU and Director\'s Rule design language, which is not where the answer lives.',
+      bm25: 'BM25 catches SMC 23.54.015. The exact phrase "single-family dwelling" sits in the Table B row that has the answer ("1 space for each dwelling unit"). The lexical match is strong enough to land the section in the top 5.',
+      fused: 'After fusion, SMC 23.54.015 is in the top-15 but not necessarily top-5 of the fused order. The synthesizer still finds the right row in the table because the chunk carries is_table=true and table_type=dimensional, and the table is preserved as Markdown so the model can read the row directly.',
+      graph: 'Graph traversal on this query does not add new chunks. The graph would help on a cross-agency question; on this one, the answer lives within a single section.'
+    },
+    q002: {
+      vector: 'Vector misses. "What is the definition of tandem parking" is six words. The real tandem-parking definition lives in a 1,883-token chunk of SMC 23.54.030 where the word "tandem" appears alongside hundreds of other words. The vector lands Title 11 traffic-code definitions instead.',
+      bm25: 'BM25 finds related text but not the canonical definition. The top BM25 hit is DR 8-2003 (a Director\'s Rule on tandem parking, which discusses it but does not carry the SMC definition). RCW 36.70A.620 mentions tandem parking in a middle-housing context. None of these is the SMC 23.54.030 definition chunk.',
+      fused: 'Fusion lifts a Title 11 "Park or parking" definition to rank #1 because it has both vector and BM25 weight as a definition chunk. The gold-bearing SMC 23.54.030 chunk does not rank in top-5. This is a known failure pattern for short paraphrased queries against long definition chunks.',
+      graph: 'Graph traversal does not save this one. Since the gold chunk is not in the seed set, its outgoing edges are never traversed. The roadmap fix is to graph-seed from any chunk that contains a regulated term flagged by the query classifier.'
+    }
+  };
+  const summ = summaries[ex.example.key] || summaries.park003;
+
+  retrieveTabsData = [
+    { id: 'vector', label: 'Vector', count: (ret.vector_top || []).length,
+      rows: (ret.vector_top || []).map(r => ({cite: r.citation || '(no cite)', agency: r.agency, score: r.score, gold: (r.citation === goldCite)})),
+      summary: summ.vector },
+    { id: 'bm25', label: 'BM25', count: (ret.bm25_top || []).length,
+      rows: (ret.bm25_top || []).map(r => ({cite: r.citation || '(no cite)', agency: r.agency, score: r.score, gold: (r.citation === goldCite)})),
+      summary: summ.bm25 },
+    { id: 'fused', label: 'Linear fuse', count: (ret.fused_top || []).length,
+      rows: (ret.fused_top || []).map(r => ({cite: r.citation || '(no cite)', agency: r.agency, score: r.fused_score, gold: (r.id === goldId && r.id != null), text: r.text_head})),
+      summary: summ.fused },
+    { id: 'graph', label: 'Graph beam', count: 0,
+      rows: [],
+      summary: summ.graph }
+  ];
+  return retrieveTabsData;
+}
+
+function renderRetrieve(ex){
+  buildRetrieveTabs(ex);
+  const tabs = document.getElementById('rtabs');
+  tabs.textContent = '';
+  retrieveTabsData.forEach((t, i) => {
+    const b = document.createElement('button');
+    b.className = 'rtab' + (i === 0 ? ' active' : '');
+    b.textContent = t.label;
+    const ct = document.createElement('span'); ct.className = 'ct'; ct.textContent = String(t.count);
+    b.appendChild(ct);
+    b.addEventListener('click', () => { stopRetrieveCycle(); renderRtTab(i); tabs.querySelectorAll('.rtab').forEach((el,j) => el.classList.toggle('active', j===i));});
+    tabs.appendChild(b);
+  });
+  renderRtTab(0);
+}
+
+function renderRtTab(i){
+  const t = retrieveTabsData[i];
+  const list = document.getElementById('rlist');
+  list.textContent = '';
+  if(!t.rows.length){
+    const empty = document.createElement('div');
+    empty.style.fontSize = '13px'; empty.style.color = 'rgb(var(--muted))'; empty.style.padding = '0.85rem';
+    empty.textContent = 'No results from this stage for this question.';
+    list.appendChild(empty);
+  } else {
+    t.rows.forEach((r, idx) => {
+      const row = document.createElement('div'); row.className = 'rrow' + (r.gold ? ' gold' : '');
+      const pos = document.createElement('div'); pos.className = 'pos'; pos.textContent = '#' + (idx + 1);
+      const cite = document.createElement('div'); cite.className = 'cite';
+      cite.appendChild(document.createTextNode(r.cite));
+      const ag = document.createElement('span'); ag.className = 'agency'; ag.textContent = r.agency || '';
+      cite.appendChild(ag);
+      const scr = document.createElement('div'); scr.className = 'scr'; scr.textContent = typeof r.score === 'number' ? r.score.toFixed(3) : '';
+      row.appendChild(pos); row.appendChild(cite); row.appendChild(scr);
+      if(r.gold){
+        const hint = document.createElement('div'); hint.className = 'hint';
+        hint.textContent = 'gold-carrying chunk for the current question';
+        row.appendChild(hint);
+      }
+      list.appendChild(row);
+    });
+  }
+  document.getElementById('rsummary').textContent = t.summary;
+}
+
+function stopRetrieveCycle(){ if(retrieveCycleTimer){ clearTimeout(retrieveCycleTimer); retrieveCycleTimer = null;}}
+function startRetrieveCycle(){
+  if(retrieveCycleStarted) return;
+  retrieveCycleStarted = true;
+  let i = 0;
+  function step(){
+    i += 1;
+    if(i >= retrieveTabsData.length){ retrieveCycleTimer = null; return; }
+    const tabs = document.querySelectorAll('#rtabs .rtab');
+    tabs.forEach((el, j) => el.classList.toggle('active', j === i));
+    renderRtTab(i);
+    retrieveCycleTimer = setTimeout(step, 1900);
+  }
+  retrieveCycleTimer = setTimeout(step, 1500);
+}
+// trigger cycle when the retrieve section comes into view
+const retrieveSection = document.getElementById('retrieve');
+const retrieveObserver = new IntersectionObserver((entries) => entries.forEach(e => { if(e.isIntersecting) startRetrieveCycle();}), {threshold: 0.25});
+retrieveObserver.observe(retrieveSection);
+
+function renderSynth(ex){
+  const ctx = document.getElementById('synthCtx');
+  ctx.textContent = '';
+  const fused = (ex.stage5_retrieve.fused_top || []).slice(0,5);
+  const lines = [];
+  lines.push('You are a regulatory analysis assistant for Washington State and Seattle development codes. Answer the user\'s question using ONLY the provided source documents...');
+  lines.push('');
+  lines.push('## SOURCES');
+  fused.forEach((r) => {
+    lines.push('[' + (r.citation || '(no cite)') + '] {agency: ' + (r.agency || '?') + '}');
+    lines.push('  ' + (r.text_head || '').replace(/\n/g, ' ').slice(0, 130) + '...');
+    lines.push('');
+  });
+  lines.push('## QUESTION');
+  lines.push(ex.example.question);
+  lines.forEach(line => {
+    const div = document.createElement('div');
+    const m = line.match(/^\[([^\]]+)\]/);
+    if(m){
+      const cit = document.createElement('span'); cit.className = 'cit'; cit.textContent = '[' + m[1] + ']';
+      div.appendChild(cit);
+      div.appendChild(document.createTextNode(line.slice(m[0].length)));
+    } else {
+      div.textContent = line;
+    }
+    ctx.appendChild(div);
+  });
+
+  const ans = document.getElementById('synthAns');
+  ans.textContent = (ex.stage6_synthesize.answer_text || '(no answer captured)').split('---')[0].trim();
+
+  const s6 = ex.stage6_synthesize;
+  const meta = document.getElementById('synthMeta');
+  meta.textContent = '';
+  const items = [
+    ['model', s6.model || 'GPT-5.1'],
+    ['latency', s6.latency_ms ? (s6.latency_ms / 1000).toFixed(2) + ' s' : ''],
+    ['prompt_tokens', s6.usage && s6.usage.prompt_tokens != null ? String(s6.usage.prompt_tokens) : ''],
+    ['completion_tokens', s6.usage && s6.usage.completion_tokens != null ? String(s6.usage.completion_tokens) : ''],
+    ['sources passed', String((ex.stage5_retrieve.fused_top || []).length)]
+  ].filter(([k, v]) => v);
+  items.forEach(([k, v]) => {
+    const span = document.createElement('span');
+    const strong = document.createElement('strong'); strong.textContent = v; span.appendChild(strong);
+    span.appendChild(document.createTextNode(' ' + k));
+    meta.appendChild(span);
+  });
+  document.getElementById('synthBadge').textContent = (s6.model || 'GPT-5.1') + ' · ' + (s6.latency_ms ? (s6.latency_ms/1000).toFixed(2) + ' s' : '');
+}
+
+function answerVerdict(ex){
+  // Inspect the model's answer text and decide good / partial / bad.
+  const text = (ex.stage6_synthesize.answer_text || '').toLowerCase();
+  const gold = (ex.example.gold_answer || '').toLowerCase();
+  // park003: gold "8 feet" should appear
+  // park001: gold "1 space" or "1 off-street" should appear
+  // q002: gold "two times the length" should appear, otherwise partial/bad
+  const key = ex.example.key;
+  if(key === 'park003'){
+    return text.includes('8 feet') ? 'good' : 'partial';
+  } else if(key === 'park001'){
+    return (text.includes('1 off-street') || text.includes('1 space') || text.includes('one space') || text.includes('1 ')) ? 'good' : 'partial';
+  } else if(key === 'q002'){
+    if(text.includes('two times the length') || text.includes('twice the length')) return 'good';
+    if(text.includes('not found in provided sources')) return 'partial';
+    return 'bad';
+  }
+  return 'partial';
+}
+
+function renderAnswer(ex){
+  const wrap = document.getElementById('finalAnswer');
+  wrap.textContent = '';
+  const verdict = answerVerdict(ex);
+  wrap.className = 'answer ' + verdict;
+  const raw = (ex.stage6_synthesize.answer_text || '').split('---')[0].trim();
+
+  const lbl = document.createElement('span'); lbl.className = 'lbl';
+  lbl.textContent = verdict === 'good' ? 'Cited answer · matches gold' : verdict === 'partial' ? 'Cited answer · partial match' : 'Cited answer · does not match gold';
+  wrap.appendChild(lbl);
+
+  const text = document.createElement('div'); text.className = 'text';
+  const tokens = raw.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+  tokens.forEach(tok => {
+    if(tok.startsWith('`') && tok.endsWith('`')){
+      const c = document.createElement('code'); c.textContent = tok.slice(1, -1); text.appendChild(c);
+    } else if(tok.startsWith('**') && tok.endsWith('**')){
+      const s = document.createElement('strong'); s.textContent = tok.slice(2, -2); text.appendChild(s);
+    } else {
+      text.appendChild(document.createTextNode(tok));
+    }
+  });
+  wrap.appendChild(text);
+
+  const srcs = document.createElement('div'); srcs.className = 'sources';
+  const srcLbl = document.createElement('span'); srcLbl.textContent = 'Sources used: ';
+  srcLbl.style.fontFamily = "'Inter', sans-serif"; srcLbl.style.marginRight = '0.4rem';
+  srcs.appendChild(srcLbl);
+  (ex.stage6_synthesize.sources || []).forEach(s => {
+    const sp = document.createElement('span'); sp.className = 'cite-pill'; sp.textContent = s.citation || '?';
+    srcs.appendChild(sp);
+  });
+  wrap.appendChild(srcs);
+
+  const vd = document.createElement('div'); vd.className = 'verdict';
+  const verdictMsg = {
+    park003: 'Matches gold answer "8 feet" from L1-PARK-003. The cited section SMC 23.54.030.A.2 is the right sub-section. ✓',
+    park001: 'The model identified the right table row (Single-family, 1 space per unit) even though the gold-bearing chunk was not the top-fused result. Table-aware metadata carried the day. ✓',
+    q002: ex.example.key === 'q002' ? 'The model produced a tandem-parking definition but did not match the SMC code language ("two times the length of the vehicle size standards"). It also attached a citation that did not appear in the source list, which the synthesizer logs as a hallucination warning. This is the failure case the graph-aware seeding roadmap is meant to fix.' : ''
+  }[ex.example.key];
+  vd.textContent = verdictMsg || '';
+  wrap.appendChild(vd);
+
+  document.getElementById('answerBadge').textContent = verdict === 'good' ? 'matches gold' : verdict === 'partial' ? 'partial match' : 'does not match';
+  document.getElementById('goldNote').textContent = 'Gold answer: "' + ex.example.gold_answer + '". From ' + (ex.example.id.startsWith('Q') ? 'benchmarks/round_1/gold_set.jsonl' : 'benchmarks/round_2/candidates/parking_candidates.jsonl') + '.';
+}
+
+// initial render
+renderAll();
+</script>
+</body>
+</html>

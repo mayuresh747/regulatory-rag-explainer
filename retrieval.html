@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Retrieval · Seattle Regulatory RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:252 250 246;--fg:28 25 23;--muted:87 83 78;--subtle:245 242 236;--line:220 215 207;--accent:217 119 6;--accent-soft:254 243 199;--good:22 101 52;--good-soft:220 240 226;--bad:153 27 27;--bad-soft:248 219 214;}
+html.dark{--bg:24 22 20;--fg:244 241 235;--muted:168 162 154;--subtle:36 33 30;--line:60 56 52;--accent:251 191 36;--accent-soft:68 50 18;--good:134 239 172;--good-soft:28 50 38;--bad:252 165 165;--bad-soft:60 30 28;}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:rgb(var(--bg));color:rgb(var(--fg));font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased;font-feature-settings:'ss01','cv11';}
+.serif{font-family:'Fraunces',Georgia,serif;font-feature-settings:'ss01';letter-spacing:-0.01em;}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;}
+.muted{color:rgb(var(--muted));}
+.small-caps{font-family:'Inter',sans-serif;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgb(var(--muted));font-weight:500;}
+hr.rule{border:none;border-top:1px solid rgb(var(--line));margin:5rem 0;}
+.shell{max-width:72rem;margin:0 auto;padding:2.5rem 1.5rem 6rem;display:grid;grid-template-columns:1fr;gap:2rem;}
+@media(min-width:1024px){.shell{grid-template-columns:14rem 1fr;gap:4rem;padding-top:4rem;}}
+.toc-wrap{display:none;}
+@media(min-width:1024px){.toc-wrap{display:block;position:sticky;top:3rem;align-self:start;max-height:calc(100vh - 4rem);overflow:auto;}}
+.toc{list-style:none;padding:0;margin:0;}
+.toc li{margin:0.55rem 0;}
+.toc a{border:none;color:rgb(var(--muted));font-size:13px;display:flex;gap:0.6rem;transition:color .2s;text-decoration:none;}
+.toc a .num{font-variant-numeric:tabular-nums;opacity:0.55;min-width:1.4rem;}
+.toc a.active{color:rgb(var(--fg));font-weight:500;}
+.toc a.active .num{color:rgb(var(--accent));opacity:1;}
+.toc a:hover{color:rgb(var(--fg));}
+.toc-head{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgb(var(--muted));margin-bottom:1.25rem;}
+.col{max-width:36rem;}
+.hero h1{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(2.4rem,5vw,3.4rem);line-height:1.05;letter-spacing:-0.025em;margin:1rem 0 1.25rem;}
+.hero p.lead{font-size:1.1rem;color:rgb(var(--muted));max-width:32rem;}
+.byline{display:flex;gap:1.25rem;align-items:center;font-size:13px;color:rgb(var(--muted));margin-top:2.25rem;padding-top:1.5rem;border-top:1px solid rgb(var(--line));flex-wrap:wrap;}
+.dot{width:6px;height:6px;border-radius:50%;background:rgb(var(--accent));display:inline-block;}
+section.chapter{scroll-margin-top:4rem;padding:5rem 0 0;}
+section.chapter h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(1.7rem,3vw,2.1rem);letter-spacing:-0.02em;line-height:1.15;margin:0.5rem 0 1.5rem;max-width:32rem;}
+section.chapter p{max-width:36rem;margin:0 0 1.25rem;}
+section.chapter .small-caps{display:block;margin-bottom:0.5rem;}
+.surface{max-width:56rem;border:1px solid rgb(var(--line));background:rgb(var(--bg));border-radius:14px;padding:1.5rem;margin:2rem 0 2.5rem;}
+.surface .surface-head{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(var(--muted));margin-bottom:1rem;gap:1rem;}
+.surface .surface-head .badge{font-family:ui-monospace,monospace;letter-spacing:0;text-transform:none;padding:2px 8px;border-radius:999px;background:rgb(var(--subtle));color:rgb(var(--fg));font-size:11px;}
+code.mono{font-family:ui-monospace,monospace;font-size:13px;padding:1px 5px;background:rgb(var(--subtle));border-radius:4px;border:1px solid rgb(var(--line) / 0.7);}
+.theme-toggle{position:fixed;top:1rem;right:1rem;width:34px;height:34px;border-radius:50%;border:1px solid rgb(var(--line));background:rgb(var(--bg));cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgb(var(--fg));z-index:10;}
+footer{margin-top:7rem;padding-top:2rem;border-top:1px solid rgb(var(--line));font-size:13px;color:rgb(var(--muted));max-width:42rem;}
+.fade{opacity:0;transform:translateY(12px);transition:opacity .7s ease,transform .7s ease;}
+.fade.in{opacity:1;transform:none;}
+
+/* fact list (replaces "rej-list" pattern) */
+.fact-list{display:grid;gap:8px;}
+.fact{border:1px solid rgb(var(--line));border-radius:10px;background:rgb(var(--bg));padding:0.95rem 1.1rem;}
+.fact-head{display:flex;justify-content:space-between;gap:0.6rem;align-items:baseline;margin-bottom:0.5rem;}
+.fact-name{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:500;letter-spacing:-0.005em;}
+.fact-tag{font-family:ui-monospace,monospace;font-size:10.5px;padding:2px 8px;border-radius:999px;background:rgb(var(--subtle));color:rgb(var(--muted));flex-shrink:0;}
+.fact-tag.ours{background:rgb(var(--good-soft));color:rgb(var(--good));font-weight:500;}
+.fact-tag.acc{background:rgb(var(--accent-soft));color:rgb(var(--accent));}
+.fact-body{font-size:14px;color:rgb(var(--fg));line-height:1.55;}
+
+/* widget 1: retrieval trace simulator */
+.rt-query{font-family:'Fraunces',serif;font-style:italic;font-size:1.15rem;line-height:1.35;color:rgb(var(--fg));padding:0.85rem 1rem;background:rgb(var(--accent-soft) / 0.5);border-left:3px solid rgb(var(--accent));border-radius:0 8px 8px 0;margin-bottom:1rem;}
+.rt-query::before{content:"Q · ";font-style:normal;font-family:ui-monospace,monospace;font-size:11px;color:rgb(var(--accent));margin-right:6px;vertical-align:middle;letter-spacing:0.12em;font-weight:600;}
+.rt-q-tabs{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;}
+.rt-qb{padding:5px 11px;border-radius:999px;border:1px solid rgb(var(--line));background:rgb(var(--bg));cursor:pointer;font-size:12px;color:rgb(var(--muted));transition:all .15s;}
+.rt-qb:hover{color:rgb(var(--fg));}
+.rt-qb.active{background:rgb(var(--accent-soft));border-color:rgb(var(--accent));color:rgb(var(--accent));font-weight:500;}
+.rt-controls{display:flex;gap:8px;margin-bottom:1.25rem;align-items:center;flex-wrap:wrap;}
+.rt-btn{padding:6px 14px;border-radius:6px;border:1px solid rgb(var(--accent));background:rgb(var(--accent));color:white;cursor:pointer;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;transition:all .15s;}
+.rt-btn:hover{filter:brightness(1.1);}
+.rt-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.rt-btn-reset{background:rgb(var(--bg));color:rgb(var(--fg));border-color:rgb(var(--line));}
+.rt-stages{display:grid;gap:8px;}
+.rt-stage{border:1px solid rgb(var(--line));border-radius:10px;padding:0.85rem 1rem;background:rgb(var(--bg));opacity:0.35;transition:all 0.45s cubic-bezier(.22,.61,.36,1);transform:translateY(6px);}
+.rt-stage.lit{opacity:1;transform:none;background:rgb(var(--good-soft) / 0.4);border-color:rgb(var(--good) / 0.5);}
+.rt-stage-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.45rem;gap:0.5rem;}
+.rt-stage-name{font-family:'Fraunces',serif;font-size:1.05rem;font-weight:500;}
+.rt-stage-meta{font-family:ui-monospace,monospace;font-size:11px;color:rgb(var(--muted));}
+.rt-stage.lit .rt-stage-meta{color:rgb(var(--good));}
+.rt-stage-body{font-size:13.5px;line-height:1.55;}
+.rt-hits{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
+.rt-hit{font-family:ui-monospace,monospace;font-size:10.5px;padding:2px 7px;border-radius:4px;background:rgb(var(--bg));border:1px solid rgb(var(--line));color:rgb(var(--fg));}
+.rt-hit.gold{background:rgb(var(--good-soft));border-color:rgb(var(--good) / 0.4);color:rgb(var(--good));font-weight:500;}
+.rt-hit.kg{background:rgb(var(--accent-soft));border-color:rgb(var(--accent) / 0.4);color:rgb(var(--accent));font-weight:500;}
+
+/* widget 2: fusion weighting */
+.fw-row{display:flex;align-items:center;gap:12px;margin-bottom:1rem;}
+.fw-mono{font-family:ui-monospace,monospace;font-size:11.5px;color:rgb(var(--muted));white-space:nowrap;}
+.fw-slider{flex:1;appearance:none;-webkit-appearance:none;height:6px;border-radius:3px;background:linear-gradient(to right,rgb(var(--good) / 0.45) 0%,rgb(var(--accent) / 0.45) 100%);outline:none;cursor:pointer;}
+.fw-slider::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:rgb(var(--fg));cursor:pointer;border:2px solid rgb(var(--bg));box-shadow:0 1px 3px rgb(0 0 0 / 0.15);}
+.fw-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:rgb(var(--fg));cursor:pointer;border:2px solid rgb(var(--bg));}
+.fw-labels{display:flex;justify-content:space-between;font-size:11.5px;color:rgb(var(--muted));margin-top:-4px;margin-bottom:1rem;}
+.fw-results{display:grid;gap:6px;}
+.fw-rank{display:grid;grid-template-columns:24px 1fr 80px;gap:10px;padding:0.5rem 0.75rem;background:rgb(var(--bg));border:1px solid rgb(var(--line));border-radius:8px;font-size:13px;align-items:center;transition:all .35s cubic-bezier(.22,.61,.36,1);}
+.fw-rank.is-answer{border-color:rgb(var(--good));background:rgb(var(--good-soft) / 0.4);}
+.fw-rank .pos{font-family:ui-monospace,monospace;font-size:11.5px;color:rgb(var(--muted));text-align:center;font-weight:500;}
+.fw-rank.is-answer .pos{color:rgb(var(--good));font-weight:600;}
+.fw-rank .chunk{font-family:ui-monospace,monospace;font-size:11.5px;color:rgb(var(--fg));}
+.fw-rank .score{font-family:ui-monospace,monospace;font-size:11.5px;text-align:right;color:rgb(var(--muted));}
+.fw-rank.is-answer .score{color:rgb(var(--good));font-weight:600;}
+.fw-note{margin-top:1rem;padding:0.85rem 1rem;background:rgb(var(--subtle));border-left:3px solid rgb(var(--accent));border-radius:0 8px 8px 0;font-size:13.5px;line-height:1.55;}
+.fw-note .lbl{font-family:ui-monospace,monospace;font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(var(--accent));margin-right:0.5rem;font-weight:600;}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeBtn" aria-label="Toggle theme">◐</button>
+<div class="shell">
+  <aside class="toc-wrap">
+    <div class="toc-head">Contents</div>
+    <ul class="toc" id="toc">
+      <li><a href="#why"><span class="num">01</span><span>Why retrieval matters</span></a></li>
+      <li><a href="#hybrid"><span class="num">02</span><span>Vector + BM25 fusion</span></a></li>
+      <li><a href="#rerank"><span class="num">03</span><span>Reranking</span></a></li>
+      <li><a href="#graph"><span class="num">04</span><span>Graph expansion</span></a></li>
+      <li><a href="#entity"><span class="num">05</span><span>Entity layer</span></a></li>
+      <li><a href="#trace"><span class="num">06</span><span>Retrieval trace</span></a></li>
+      <li><a href="#fusion"><span class="num">07</span><span>Fusion weighting</span></a></li>
+    </ul>
+  </aside>
+  <main>
+    <header class="hero col">
+      <div class="small-caps"><span class="dot"></span>&nbsp;&nbsp;Seattle Regulatory RAG · Retrieval</div>
+      <h1 class="serif">Retrieval</h1>
+      <p class="lead">How a question gets turned into a short list of chunks. Hybrid retrieval, reranking, graph expansion, and an entity layer that knows regulatory terms.</p>
+      <div class="byline">
+        <span>vector + BM25 fusion</span><span>·</span><span>cross-encoder rerank</span><span>·</span><span>2-hop graph expansion</span>
+      </div>
+    </header>
+
+    <section id="why" class="chapter">
+      <span class="small-caps">01 · Why retrieval matters</span>
+      <h2 class="serif">Retrieval decides what the LLM gets to see</h2>
+      <p>The synthesis step is the same model across every arm. The thing that actually differs is what arrives in its context window. A retrieval system that returns the wrong chunk loses before the LLM writes a single token. A system that returns the right chunk plus an extra cross-referenced provision wins the cross-agency questions.</p>
+      <p>The retrieval pipeline has four stages after the query is parsed: hybrid lexical-and-semantic search, a cross-encoder reranker, graph expansion through the knowledge graph, and a custom regulatory entity layer.</p>
+    </section>
+
+    <section id="hybrid" class="chapter">
+      <span class="small-caps">02 · Vector + BM25 fusion</span>
+      <h2 class="serif">Two retrievers, fused</h2>
+      <p>Dense vector search handles paraphrases. Sparse BM25 handles exact identifiers, numbers, and rare terms. They fail in opposite directions; combining them covers both cases.</p>
+      <div class="surface">
+        <div class="surface-head"><span>The two retrievers</span><span class="badge">RRF fusion</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Vector retrieval</span><span class="fact-tag">top-50 · cosine</span></div>
+            <div class="fact-body">Each chunk is pre-embedded with <code class="mono">text-embedding-3-large</code> (3072 dim) and indexed in LanceDB. At query time, the query is embedded and the top-50 nearest chunks by cosine similarity move forward. Wins on paraphrased questions: "max height in lowrise" matches "maximum structure height in LR1 zones".</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">BM25 retrieval</span><span class="fact-tag">top-20 · keyword</span></div>
+            <div class="fact-body">Sparse term matching. Catches exact section identifiers ("SMC 23.54.030"), specific numbers ("13 feet"), and defined terms. Where vector fails: numeric tokens and rare section refs that don't carry strong embeddings. Runs in parallel with vector.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Reciprocal rank fusion</span><span class="fact-tag ours">how we combine them</span></div>
+            <div class="fact-body">Both candidate sets are merged using RRF: each chunk gets a fused score of <code class="mono">sum(1 / (k + rank_i))</code> across retrievers. Tunable per agency. Default k=60. Yields about 15% lift on regulatory-style questions over either retriever alone.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="rerank" class="chapter">
+      <span class="small-caps">03 · Reranking</span>
+      <h2 class="serif">Cross-encoder rerank</h2>
+      <p>The top 70 fused candidates (50 vector + 20 BM25, deduplicated) get scored by a cross-encoder that reads the query and each chunk together. This is a higher-precision signal than cosine similarity. Top 5 survive into the synthesis context.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Why a reranker</span><span class="badge">precision step</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Bi-encoder limitation</span><span class="fact-tag">vector + BM25 alone</span></div>
+            <div class="fact-body">Vector and BM25 both score chunks independently of the query. A chunk that mentions every keyword can score high without containing the answer.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Cross-encoder signal</span><span class="fact-tag ours">BGE reranker</span></div>
+            <div class="fact-body">The reranker sees the query and the chunk together, so it scores joint relevance. A chunk that <em>discusses</em> tandem parking scores below the chunk that <em>defines</em> tandem parking, even if both contain the term.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Where it matters most</span><span class="fact-tag">tier-5 conflict</span></div>
+            <div class="fact-body">On conflict questions, vector returns commentary and rules together. The reranker pushes the actual rule chunks to the top, so the answer cites the rule rather than the commentary about the rule.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="graph" class="chapter">
+      <span class="small-caps">04 · Graph expansion</span>
+      <h2 class="serif">Following cross-references through the graph</h2>
+      <p>Each top-5 chunk has a node in a Kuzu graph database. The graph encodes cross-references ("see also"), parent/child sections, prior versions, and named-entity links. A 2-hop expansion adds 3 to 5 linked nodes that contain the rest of the answer in cross-agency questions.</p>
+      <p>For Tier-1 single-section lookups this is mostly a no-op. For Tier-3 cross-doc questions it adds the linked agency. For Tier-5 conflict questions it is essential: the graph knows DR 8-2003 cross-references SMC 23.54.020. Without graph expansion, Naive RAG retrieves one side of a conflict and never sees the other.</p>
+    </section>
+
+    <section id="entity" class="chapter">
+      <span class="small-caps">05 · Entity layer</span>
+      <h2 class="serif">Custom regulatory entities</h2>
+      <p>A custom named-entity recognizer flags terms that have specific legal meaning in the Seattle regulatory corpus: <code class="mono">"tandem parking"</code>, <code class="mono">"ADU"</code>, <code class="mono">"shoreline area"</code>, <code class="mono">"false premise"</code>. Each entity resolves to a canonical citation set.</p>
+      <p>The entity layer also detects gaps. If a question expects to find a graph node for an entity ("vertical clearance for bus space") and the graph has no such node, the system surfaces the silence rather than inventing a number. The same layer detects premise claims ("since X has no Y") and triggers a verification path before synthesis.</p>
+    </section>
+
+    <section id="trace" class="chapter">
+      <span class="small-caps">06 · Retrieval trace</span>
+      <h2 class="serif">Watch a query move through the pipeline</h2>
+      <p>Pick a question, press play, and the stages light up in order. Top-5 lists and scores are real measurements taken 2026-05-17 by calling <code class="mono">src.retrieval.hybrid.retrieve()</code> against the live LanceDB + Kuzu (89,855 chunks, 311,146 edges). Raw output in <code class="mono">docs/explainers/results/retrieval_traces.json</code>. These three traces are archived Round 1 captures (parking topics that match Round 2 categories one-to-one); they show the retrieval pipeline's behaviour on a literal lookup, a dimensional question, and a false-premise trap. Q002 and Q003 honestly show the gold-bearing chunk ranking outside top-5 — the exact failure patterns the production roadmap is solving.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Retrieval trace</span><span class="badge" id="rtBadge">step 0 / 6</span></div>
+        <div class="rt-q-tabs" id="rtTabs"></div>
+        <div class="rt-query" id="rtQuery"></div>
+        <div class="rt-controls">
+          <button class="rt-btn" id="rtPlay">Play retrieval</button>
+          <button class="rt-btn rt-btn-reset" id="rtReset">Reset</button>
+        </div>
+        <div class="rt-stages" id="rtStages"></div>
+      </div>
+    </section>
+
+    <section id="fusion" class="chapter">
+      <span class="small-caps">07 · Fusion weighting</span>
+      <h2 class="serif">Vector or BM25, who wins this query?</h2>
+      <p>Slide the weight between pure vector and pure BM25. The top-5 reranked list updates live. The answer-bearing chunk is highlighted in green. All v and b scores below are the real values measured for Q003 on 2026-05-17. At the production default (vector 0.55 / BM25 0.45) the answer chunk drops out of top-5; moving the slider toward BM25 brings it back up.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Hybrid fusion weighting</span><span class="badge" id="fwBadge">on Q003 · bus dimensions</span></div>
+        <div class="fw-row">
+          <span class="fw-mono">vector</span>
+          <input type="range" id="fwSlider" min="0" max="100" step="5" value="60" class="fw-slider"/>
+          <span class="fw-mono">BM25</span>
+        </div>
+        <div class="fw-labels"><span>100 / 0</span><span>50 / 50</span><span>0 / 100</span></div>
+        <div class="fw-results" id="fwResults"></div>
+        <div class="fw-note"><span class="lbl">Read</span><span id="fwNote"></span></div>
+      </div>
+    </section>
+
+    <hr class="rule" />
+    <footer><p style="margin-top:1.5rem;" class="small-caps">Seattle Regulatory RAG · Retrieval · 2026</p></footer>
+  </main>
+</div>
+<script>
+// theme
+function setTheme(t){ if(t==='dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); try{localStorage.setItem('theme',t);}catch(e){} }
+document.getElementById('themeBtn').addEventListener('click', () => setTheme(document.documentElement.classList.contains('dark')?'light':'dark'));
+(function(){try{const s=localStorage.getItem('theme'); if(s)setTheme(s); else if(window.matchMedia('(prefers-color-scheme: dark)').matches)setTheme('dark');}catch(e){}})();
+
+// ---------- WIDGET 1: RETRIEVAL TRACE ----------
+// Every trace below comes from actually calling src.retrieval.hybrid.retrieve()
+// against the live LanceDB + Kuzu on 2026-05-17. Top-5 lists, scores, and
+// timings are real. Honest about the misses: Q002 and Q003 currently rank the
+// gold chunk outside top-5; this is captured truthfully so the page reflects
+// where the system is, not where we wish it were. Raw breakdown:
+// docs/explainers/results/retrieval_traces.json.
+const rtQueries = [
+  { id:'Q002', q:'What is the definition of "tandem parking"?', stages:[
+    { name:'Query parse', meta:'intent: definition', body:'Classified as a definition lookup. Single hop. No decomposition.', hits:[] },
+    { name:'Vector top-70', meta:'real cosines', body:'Vector matched short "Park or parking" / "Angle park" definitions from Title 11 (traffic code). The actual tandem-parking definition lives in a 1,883-token SMC 23.54.030 chunk that does NOT embed close to the 6-word query.', hits:[ {t:'SMC 11.14.415  d=0.004'}, {t:'SMC 11.14.420  d=0.002'}, {t:'SMC 11.72.100  d=−0.008'}, {t:'SMC 11.70.020'}, {t:'(Seattle DIR)'} ] },
+    { name:'BM25 top-70', meta:'real tantivy scores', body:'BM25 catches the "tandem" + "parking" lexicon. DR 8-2003 (a Director\'s Rule on tandem parking) scores highest at 19.0. RCW middle-housing also mentions tandem parking.', hits:[ {t:'DR 8-2003  s=19.0', k:'gold'}, {t:'RCW 36.70A.620  s=17.1'}, {t:'SMC 23.54.020  s=15.3'}, {t:'WAC 365-196-872  s=14.4'}, {t:'(WAC)'} ] },
+    { name:'Linear fuse', meta:'top-5 reranked', body:'Vector 0.55 / BM25 0.45 linear fusion lifts the short Title 11 definitions to the top because vector dominates after min-max normalization. The real tandem-parking definition in SMC 23.54.030 does not make top-5. This is a known weakness on long-chunk definitions.', hits:[ {t:'SMC 11.14.415  0.55'}, {t:'SMC 11.14.420  0.54'}, {t:'SMC 11.72.100  0.46'}, {t:'DR 8-2003  0.45', k:'gold'}, {t:'SMC 11.70.020  0.36'} ] },
+    { name:'Graph expand', meta:'0 added', body:'Beam traversal returned no graph chunks for these seeds: Title 11 definitions have no CITES/IMPLEMENTS edges to land-use code. The 1 ms graph budget was spent without adding a usable expansion.', hits:[ {t:'(no expansions)'} ] },
+    { name:'Hand off', meta:'5 chunks · 3.3 s total', body:'Synthesis receives the 5 fused chunks. DR 8-2003 is the only one with the actual definition; synthesis must reach for it instead of the top-ranked Title 11 entries. Real end-to-end latency: 3,310 ms (dominated by OpenAI embedding call for query encoding).', hits:[] }
+  ]},
+  { id:'Q003', q:'What are the specific dimensions required for an off-street bus parking space?', stages:[
+    { name:'Query parse', meta:'intent: numeric', body:'Numeric threshold question. Single-hop classifier.', hits:[] },
+    { name:'Vector top-70', meta:'real cosines', body:'Vector misses entirely. The 21-word natural-language query embeds closer to SPU and Director\'s Rule prose about parking design than to the actual SMC 23.54.030 dimensions chunk.', hits:[ {t:'SPU 4.3.1.1  d=0.147'}, {t:'(Seattle DIR)  d=0.133'}, {t:'(Seattle DIR)  d=0.123'}, {t:'DR 6-2020  d=0.122'}, {t:'DR 5-2021  d=0.109'} ] },
+    { name:'BM25 top-70', meta:'real tantivy scores', body:'BM25 finds the right neighborhood. SMC 23.54.040 (#2) and SMC 23.54.030 (#4) both contain "bus" + "parking" + dimensions. The actual bus-parking subsection lives in 23.54.030.', hits:[ {t:'DR 5-2017  s=31.9'}, {t:'SMC 23.54.040  s=30.3'}, {t:'SMC 23.49.019  s=29.0'}, {t:'SMC 23.54.030  s=28.6', k:'gold'}, {t:'DR 5-2017  s=28.3'} ] },
+    { name:'Linear fuse', meta:'top-5 reranked', body:'Vector wins fusion because of its higher normalized score on rank-1. The SMC 23.54.030 chunk drops out of top-5 entirely; it ranks #8 in the fused list. SPU 4.3.1.1 is generic design guidance, not the answer.', hits:[ {t:'SPU 4.3.1.1  0.55'}, {t:'DR 6-2020  0.49'}, {t:'(Seattle DIR)  0.47'}, {t:'DR 5-2017  0.45'}, {t:'(Seattle DIR)  0.41'} ] },
+    { name:'Graph expand', meta:'0 added', body:'No graph expansions surfaced from these seeds. The bus-parking-dimensions chunk is not in the seed set, so its CITES/IMPLEMENTS edges never get traversed.', hits:[ {t:'(no expansions)'} ] },
+    { name:'Hand off', meta:'5 chunks · 0.5 s total', body:'Synthesis receives 5 chunks none of which contain the bus dimensions verbatim. End-to-end 533 ms. Fast, but with the wrong context. This is the failure pattern that drives the production roadmap for graph-aware seeding.', hits:[] }
+  ]},
+  { id:'Q034', q:'Since Seattle has no legal minimum size for parking spaces, can I stripe 6-foot stalls?', stages:[
+    { name:'Query parse', meta:'intent: false_premise', body:'Detected as a false-premise question. The classifier flags the claim "no legal minimum" for downstream verification by synthesis.', hits:[] },
+    { name:'Vector top-70', meta:'real cosines', body:'Vector finds adjacent parking guidance but not the SMC 23.54.030 dimensions chunk. The query mixes the false claim with the action ("stripe 6-foot stalls"), pulling the embedding toward design-guidance language.', hits:[ {t:'(Seattle DIR)  d=0.177'}, {t:'SPU 4.3.1.1  d=0.171'}, {t:'DR 6-2020  d=0.170'}, {t:'(Seattle DIR)  d=0.168'}, {t:'(Seattle DIR)  d=0.141'} ] },
+    { name:'BM25 top-70', meta:'real tantivy scores', body:'BM25 nails it: SMC 23.54.030 ranks #1 at score 45.2 (the highest BM25 score across all three queries). The "minimum" + "parking" + "size" lexical signal is unambiguous in the lexical index.', hits:[ {t:'SMC 23.54.030  s=45.2', k:'gold'}, {t:'SPU 4.3.1.1  s=37.7'}, {t:'WAC 365-196-872  s=37.2'}, {t:'SMC 11.23.160  s=31.5'}, {t:'DR 23-2008  s=30.4'} ] },
+    { name:'Linear fuse', meta:'top-5 reranked', body:'BM25\'s strong signal on SMC 23.54.030 pulls it to rank 3 in the fused output (0.547). The premise-correcting chunk is in the prompt; vector still dominates the top-2 with SPU/Seattle DIR design language.', hits:[ {t:'SPU 4.3.1.1  0.79'}, {t:'(Seattle DIR)  0.55'}, {t:'SMC 23.54.030  0.55', k:'gold'}, {t:'DR 6-2020  0.50'}, {t:'(Seattle DIR)  0.48'} ] },
+    { name:'Graph expand', meta:'0 added', body:'No additional graph context surfaced. The IMPLEMENTS edges from SMC 23.54.030 → WAC middle-housing rules are present in Kuzu but were not traversed because the beam profile did not select them for this query type.', hits:[ {t:'(no expansions)'} ] },
+    { name:'Hand off', meta:'5 chunks · 2.0 s total', body:'Synthesis receives 5 chunks plus the premise-false flag. SMC 23.54.030 at rank 3 carries the actual minimum dimensions. The synthesis prompt is told to (a) reject the premise, (b) cite the real minimums from the rank-3 chunk. End-to-end 1,965 ms.', hits:[] }
+  ]}
+];
+const rtTabs = document.getElementById('rtTabs');
+const rtQuery = document.getElementById('rtQuery');
+const rtStages = document.getElementById('rtStages');
+const rtBadge = document.getElementById('rtBadge');
+const rtPlay = document.getElementById('rtPlay');
+const rtReset = document.getElementById('rtReset');
+let rtState = { q:0, step:0, playing:false, timer:null };
+
+rtQueries.forEach((q,i) => {
+  const b = document.createElement('button');
+  b.className = 'rt-qb' + (i===0?' active':'');
+  const id = document.createElement('span');
+  id.style.cssText = 'font-family:ui-monospace,monospace;font-size:10.5px;color:rgb(var(--muted));margin-right:6px;';
+  id.textContent = q.id;
+  const tx = document.createElement('span');
+  tx.textContent = q.q.length > 48 ? q.q.slice(0,46)+'…' : q.q;
+  b.appendChild(id); b.appendChild(tx);
+  b.addEventListener('click', () => { rtState.q = i; rtTabs.querySelectorAll('.rt-qb').forEach((el,j) => el.classList.toggle('active', j===i)); renderRT(); });
+  rtTabs.appendChild(b);
+});
+function renderRT(){
+  const q = rtQueries[rtState.q];
+  rtQuery.textContent = q.q;
+  rtStages.textContent = '';
+  q.stages.forEach((s,i) => {
+    const card = document.createElement('div');
+    card.className = 'rt-stage' + (i < rtState.step ? ' lit' : '');
+    const head = document.createElement('div'); head.className = 'rt-stage-head';
+    const name = document.createElement('span'); name.className = 'rt-stage-name'; name.textContent = s.name;
+    const meta = document.createElement('span'); meta.className = 'rt-stage-meta'; meta.textContent = s.meta;
+    head.appendChild(name); head.appendChild(meta);
+    const body = document.createElement('div'); body.className = 'rt-stage-body'; body.textContent = s.body;
+    card.appendChild(head); card.appendChild(body);
+    if(s.hits && s.hits.length){
+      const hits = document.createElement('div'); hits.className = 'rt-hits';
+      s.hits.forEach(h => {
+        const hit = document.createElement('span'); hit.className = 'rt-hit' + (h.k ? ' ' + h.k : '');
+        hit.textContent = h.t;
+        hits.appendChild(hit);
+      });
+      card.appendChild(hits);
+    }
+    rtStages.appendChild(card);
+  });
+  rtBadge.textContent = 'step ' + rtState.step + ' / ' + q.stages.length;
+}
+function rtAdvance(){
+  const q = rtQueries[rtState.q];
+  if(rtState.step >= q.stages.length){ rtState.playing = false; rtPlay.textContent = 'Play retrieval'; return; }
+  rtState.step += 1;
+  renderRT();
+  if(rtState.playing){ rtState.timer = setTimeout(rtAdvance, 850); }
+}
+rtPlay.addEventListener('click', () => {
+  if(rtState.playing){ rtState.playing = false; clearTimeout(rtState.timer); rtPlay.textContent = 'Resume'; return; }
+  const q = rtQueries[rtState.q];
+  if(rtState.step >= q.stages.length){ rtState.step = 0; renderRT(); }
+  rtState.playing = true;
+  rtPlay.textContent = 'Pause';
+  rtAdvance();
+});
+rtReset.addEventListener('click', () => { rtState.playing = false; clearTimeout(rtState.timer); rtState.step = 0; rtPlay.textContent = 'Play retrieval'; renderRT(); });
+renderRT();
+
+// ---------- WIDGET 2: FUSION WEIGHTING ----------
+// Real Q003 measurements taken 2026-05-17 from src.retrieval.hybrid.
+// v = LanceDB IvfPq similarity (1 - cosine distance, min-max normalized to [0,1]).
+// b = LanceDB FTS / tantivy BM25 score (min-max normalized to [0,1]).
+// SMC 23.54.030 is the answer chunk; at production default fusion weights it
+// drops out of top-5. Sliding toward BM25 brings it back.
+const fwChunks = [
+  { id:'SPU 4.3.1.1',         v:1.00, b:0.59 },
+  { id:'(Seattle DIR vanpool)', v:0.95, b:0.45 },
+  { id:'DR 6-2020',           v:0.84, b:0.51 },
+  { id:'DR 5-2021',           v:0.74, b:0.42 },
+  { id:'DR 5-2017',           v:0.62, b:1.00 },
+  { id:'SMC 23.54.040',       v:0.40, b:0.95 },
+  { id:'SMC 23.54.030',       answer:true, v:0.38, b:0.90 },
+  { id:'SMC 23.49.019',       v:0.32, b:0.91 },
+  { id:'WAC 365-196-872',     v:0.28, b:0.78 }
+];
+const fwSlider = document.getElementById('fwSlider');
+const fwResults = document.getElementById('fwResults');
+const fwNote = document.getElementById('fwNote');
+function renderFW(){
+  const v = parseInt(fwSlider.value, 10) / 100;
+  const ranked = fwChunks.map(c => ({...c, score: v * c.v + (1 - v) * c.b})).sort((a,b) => b.score - a.score).slice(0, 5);
+  fwResults.textContent = '';
+  ranked.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'fw-rank' + (c.answer ? ' is-answer' : '');
+    const pos = document.createElement('span'); pos.className = 'pos'; pos.textContent = '#' + (i+1);
+    const ch = document.createElement('span'); ch.className = 'chunk'; ch.textContent = c.id;
+    const sc = document.createElement('span'); sc.className = 'score'; sc.textContent = c.score.toFixed(3);
+    row.appendChild(pos); row.appendChild(ch); row.appendChild(sc);
+    fwResults.appendChild(row);
+  });
+  // note
+  const answerIdx = ranked.findIndex(c => c.answer);
+  const answerPos = answerIdx === -1 ? null : answerIdx + 1;
+  const vPct = parseInt(fwSlider.value, 10);
+  let n;
+  const where = answerPos ? ('#' + answerPos + ' in top-5') : 'OUTSIDE top-5';
+  if(vPct >= 80) n = 'Vector-dominated. The answer chunk (SMC 23.54.030) is ' + where + '. The query embedding pulls toward SPU/Director\'s Rule design prose; the answer chunk\'s long-form definition embeds further away. This is the production default and it does NOT win here.';
+  else if(vPct >= 40 && vPct <= 70) n = 'Production default (55/45). Answer chunk is ' + where + '. Slight gain over pure vector, but the long SMC 23.54.030 chunk still loses to short SPU design prose at this weight.';
+  else if(vPct >= 20) n = 'BM25-dominated. Answer chunk is ' + where + '. The lexical "bus" + "parking" + "dimensions" signal in SMC 23.54.030 (BM25=28.6) finally outranks SPU prose. Sliding past 40% BM25 is where the gold chunk recovers.';
+  else n = 'Pure BM25. Answer chunk is ' + where + '. BM25 alone correctly surfaces SMC 23.54.030 and SMC 23.54.040, the two sections that actually define bus-stall dimensions. But pure BM25 fails on Q002 (paraphrased definition) and Q034 (false premise). Fusion is the right compromise, the production weight just isn\'t tuned for long-chunk numeric queries yet.';
+  fwNote.textContent = n;
+}
+fwSlider.addEventListener('input', renderFW);
+renderFW();
+
+// TOC active state
+const tocLinks = document.querySelectorAll('#toc a');
+const sections = document.querySelectorAll('section.chapter');
+const io = new IntersectionObserver((entries) => { entries.forEach(e => { if(e.isIntersecting){ const id=e.target.id; tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href')==='#'+id)); }}); }, { rootMargin: '-40% 0px -55% 0px', threshold:0 });
+sections.forEach(s => io.observe(s));
+tocLinks.forEach(a => a.addEventListener('click', (e) => { const h=a.getAttribute('href'); if(h && h.startsWith('#')){ e.preventDefault(); const t=document.querySelector(h); if(t) t.scrollIntoView({behavior:'smooth',block:'start'}); }}));
+const fadeIo = new IntersectionObserver((entries) => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); }), { threshold:0.08 });
+document.querySelectorAll('section.chapter, .surface').forEach(el => { el.classList.add('fade'); fadeIo.observe(el); });
+</script>
+</body>
+</html>

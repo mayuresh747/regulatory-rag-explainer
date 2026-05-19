@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Seattle Regulatory RAG · How it works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: 252 250 246;
+  --fg: 28 25 23;
+  --muted: 87 83 78;
+  --subtle: 245 242 236;
+  --line: 220 215 207;
+  --accent: 217 119 6;
+  --accent-soft: 254 243 199;
+  --good: 22 101 52;
+  --good-soft: 220 240 226;
+  --bad: 153 27 27;
+  --bad-soft: 248 219 214;
+}
+html.dark{
+  --bg: 24 22 20;
+  --fg: 244 241 235;
+  --muted: 168 162 154;
+  --subtle: 36 33 30;
+  --line: 60 56 52;
+  --accent: 251 191 36;
+  --accent-soft: 68 50 18;
+  --good: 134 239 172;
+  --good-soft: 28 50 38;
+  --bad: 252 165 165;
+  --bad-soft: 60 30 28;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01','cv11';
+}
+.serif{ font-family:'Fraunces', Georgia, serif; font-feature-settings:'ss01'; letter-spacing:-0.01em;}
+.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px;}
+.small-caps{ font-family:'Inter',sans-serif; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color: rgb(var(--muted)); font-weight:500;}
+a{ color: rgb(var(--accent)); text-decoration:none; border-bottom:1px solid rgb(var(--accent) / 0.35);}
+
+.shell{ max-width: 72rem; margin: 0 auto; padding: 4rem 1.5rem 6rem;}
+.col{ max-width: 36rem;}
+
+.hero h1{ font-family:'Fraunces',serif; font-weight:500; font-size: clamp(2.6rem, 6vw, 4rem); line-height: 1.02; letter-spacing:-0.03em; margin: 0.5rem 0 1.25rem;}
+.hero h1 em{ font-style:italic; color: rgb(var(--accent));}
+.hero p.lead{ font-size: 1.12rem; color: rgb(var(--muted)); max-width: 36rem; margin: 0 0 1.25rem;}
+.hero p.lead strong{ color: rgb(var(--fg)); font-weight: 500;}
+
+.byline{ display:flex; gap:1.25rem; align-items:center; font-size:13px; color: rgb(var(--muted)); margin-top: 2.25rem; padding-top:1.5rem; border-top: 1px solid rgb(var(--line)); flex-wrap:wrap; max-width:42rem;}
+.dot{ width:6px; height:6px; border-radius:50%; background: rgb(var(--accent)); display:inline-block;}
+
+/* ---------- why section ---------- */
+.why{ margin: 3rem 0 0; display:grid; grid-template-columns: 1fr; gap: 2rem; max-width: 56rem;}
+@media(min-width:880px){ .why{ grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: 3rem;} }
+.why h2{ font-family:'Fraunces',serif; font-weight:500; font-size: clamp(1.6rem, 3.2vw, 2.05rem); letter-spacing:-0.015em; line-height: 1.1; margin: 0.5rem 0 1rem;}
+.why h2 em{ font-style: italic; color: rgb(var(--accent));}
+.why p{ font-size: 15.5px; line-height: 1.6; max-width: 32rem; margin: 0 0 1rem; color: rgb(var(--fg));}
+.why p.muted{ color: rgb(var(--muted));}
+.why .actor{ font-size: 13px; color: rgb(var(--muted)); margin-bottom: 1.25rem;}
+.why .actor strong{ color: rgb(var(--fg)); font-weight:500;}
+.why .pill{ display:inline-block; padding:1px 8px; border-radius:999px; background: rgb(var(--subtle)); color: rgb(var(--fg)); font-size: 11.5px; font-family: ui-monospace, monospace; margin: 0 2px;}
+
+/* ---------- compare widget ---------- */
+.cmp{ border: 1px solid rgb(var(--line)); border-radius: 12px; padding: 1.25rem 1.35rem; background: rgb(var(--bg));}
+.cmp-head{ display:flex; gap: 0.75rem; align-items:baseline; font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(var(--muted)); margin-bottom: 0.75rem; flex-wrap:wrap;}
+.cmp-q{ font-family:'Fraunces',serif; font-style: italic; font-size: 1.05rem; color: rgb(var(--fg)); margin: 0 0 1rem; line-height: 1.35;}
+.cmp-grid{ display:grid; grid-template-columns: 1fr; gap: 0.75rem;}
+@media(min-width:640px){ .cmp-grid{ grid-template-columns: 1fr 1fr; gap: 0.9rem;}}
+.cmp-card{ border:1px solid rgb(var(--line)); border-radius: 10px; padding: 0.9rem 1rem; background: rgb(var(--bg)); display:flex; flex-direction: column; gap: 0.55rem;}
+.cmp-card.bad{ border-color: rgb(var(--bad) / 0.35); background: rgb(var(--bad-soft) / 0.25);}
+.cmp-card.good{ border-color: rgb(var(--good) / 0.4); background: rgb(var(--good-soft) / 0.35);}
+.cmp-who{ display:flex; gap:0.55rem; align-items:baseline; justify-content: space-between;}
+.cmp-name{ font-weight: 500; font-size: 13.5px;}
+.cmp-tag{ font-family: ui-monospace, monospace; font-size: 10.5px; padding: 1px 7px; border-radius: 999px;}
+.cmp-tag.bad{ background: rgb(var(--bad-soft)); color: rgb(var(--bad));}
+.cmp-tag.good{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.cmp-ans{ font-size: 13.5px; line-height: 1.5;}
+.cmp-ans .miss{ background: rgb(var(--bad-soft) / 0.55); padding: 0 3px; border-radius: 3px;}
+.cmp-ans .match{ background: rgb(var(--good-soft) / 0.7); padding: 0 3px; border-radius: 3px;}
+.cmp-cite{ font-family: ui-monospace, monospace; font-size: 11px; color: rgb(var(--muted));}
+.cmp-foot{ font-size: 12px; color: rgb(var(--muted)); margin-top: 0.85rem; padding-top: 0.7rem; border-top: 1px dashed rgb(var(--line));}
+.cmp-tabs{ display:flex; gap: 0.4rem; margin-bottom: 1rem; flex-wrap:wrap;}
+.cmp-tab{ font-size: 11.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); color: rgb(var(--muted)); cursor: pointer; font-family: 'Inter', sans-serif; transition: all .15s;}
+.cmp-tab.active{ background: rgb(var(--accent)); border-color: rgb(var(--accent)); color: white;}
+html.dark .cmp-tab.active{ color: rgb(28 25 23);}
+.cmp-tab:hover:not(.active){ color: rgb(var(--fg)); border-color: rgb(var(--accent) / 0.5);}
+
+/* ---------- stats strip ---------- */
+.stats{ display:grid; grid-template-columns: repeat(2, 1fr); gap:0; margin: 3.5rem 0 4rem; border-top:1px solid rgb(var(--line)); border-bottom:1px solid rgb(var(--line));}
+@media(min-width:720px){ .stats{ grid-template-columns: repeat(5, 1fr);}}
+.stat{ padding: 1.25rem 1.1rem; border-right: 1px solid rgb(var(--line)); border-bottom: 1px solid rgb(var(--line));}
+.stat:nth-child(5n){ border-right:none;}
+@media(min-width:720px){ .stat{ border-bottom:none;}}
+.stat .v{ font-family:'Fraunces',serif; font-weight:500; font-size: 1.55rem; line-height:1.1; letter-spacing:-0.015em;}
+.stat .l{ font-size: 11.5px; letter-spacing:.16em; text-transform:uppercase; color: rgb(var(--muted)); margin-top: 0.3rem;}
+
+/* ---------- pipeline map ---------- */
+.map-head{ display:flex; align-items:baseline; justify-content:space-between; gap:1rem; margin-bottom: 1.25rem; flex-wrap:wrap;}
+.map-head h2{ font-family:'Fraunces',serif; font-weight:500; font-size: 1.7rem; letter-spacing:-0.015em; margin:0;}
+.map-head .hint{ font-size: 12.5px; color: rgb(var(--muted));}
+
+.pipe{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+@media(min-width:760px){
+  .pipe{ grid-template-columns: repeat(5, 1fr); gap: 0.6rem; align-items: stretch;}
+}
+
+.stage{
+  display:flex; flex-direction:column; justify-content:space-between;
+  position: relative;
+  text-decoration:none;
+  color: rgb(var(--fg));
+  border: 1px solid rgb(var(--line));
+  background: rgb(var(--bg));
+  border-radius: 12px;
+  padding: 1rem 1rem 0.95rem;
+  min-height: 11.5rem;
+  transition: border-color .18s, transform .18s, background .18s;
+  cursor:pointer;
+}
+.stage:hover{ border-color: rgb(var(--accent)); transform: translateY(-2px);}
+.stage::after{
+  content:'';
+  display:none;
+  position: absolute;
+  right: -10px; top: 50%;
+  width: 18px; height: 1px;
+  background: rgb(var(--line));
+  z-index: 1;
+}
+@media(min-width:760px){
+  .stage:not(:last-child)::after{ display:block;}
+}
+.stage .num{
+  font-family: ui-monospace,monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  color: rgb(var(--muted));
+  text-transform: uppercase;
+}
+.stage h3{
+  font-family:'Fraunces',serif;
+  font-weight:500;
+  font-size: 1.25rem;
+  letter-spacing:-0.01em;
+  line-height: 1.1;
+  margin: 0.25rem 0 0.55rem;
+}
+.stage p{
+  font-size: 13.5px;
+  color: rgb(var(--muted));
+  margin: 0 0 0.9rem;
+  line-height: 1.45;
+}
+.stage .stat-row{
+  display:flex; align-items:baseline; gap:.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 11.5px;
+  color: rgb(var(--muted));
+  border-top: 1px dashed rgb(var(--line));
+  padding-top: 0.6rem;
+}
+.stage .stat-row strong{ color: rgb(var(--fg)); font-weight:500; font-family:'Fraunces',serif; font-size:13.5px;}
+.stage .open{
+  display:inline-flex; align-items:center; gap:.35rem;
+  margin-top: 0.6rem;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(var(--accent));
+  opacity: 0.7;
+  transition: opacity .15s, gap .15s;
+}
+.stage:hover .open{ opacity: 1; gap: 0.55rem;}
+
+/* methodology callout */
+.method-wrap{ margin-top: 1.75rem;}
+.method{
+  display:flex; flex-direction:column;
+  gap:1rem;
+  text-decoration:none; color: rgb(var(--fg));
+  border: 1px solid rgb(var(--line));
+  background: rgb(var(--subtle));
+  border-radius: 12px;
+  padding: 1.5rem 1.6rem 1.4rem;
+  transition: border-color .18s, transform .18s;
+  cursor:pointer;
+}
+.method:hover{ border-color: rgb(var(--accent)); transform: translateY(-2px);}
+.method .head{ display:flex; align-items:baseline; gap:1rem; justify-content:space-between; flex-wrap:wrap;}
+.method h3{ font-family:'Fraunces',serif; font-weight:500; font-size: 1.4rem; letter-spacing:-0.012em; margin:0;}
+.method p{ font-size: 14.5px; color: rgb(var(--muted)); margin:0; max-width: 44rem; line-height: 1.5;}
+.method .open{ font-size: 12px; font-weight:500; color: rgb(var(--accent));}
+
+/* ---------- detail row (shown on stage hover/focus) ---------- */
+.detail{
+  margin-top: 1.5rem;
+  background: rgb(var(--subtle));
+  border: 1px solid rgb(var(--line));
+  border-radius: 10px;
+  padding: 1.25rem 1.35rem;
+  min-height: 9rem;
+}
+.detail .lbl{ font-size: 10.5px; letter-spacing:.18em; text-transform:uppercase; color: rgb(var(--muted)); display:block; margin-bottom: 0.35rem;}
+.detail h4{ font-family:'Fraunces',serif; font-weight:500; font-size: 1.15rem; margin: 0 0 0.5rem; letter-spacing:-0.01em;}
+.detail p{ margin: 0 0 0.5rem; font-size: 14px; line-height: 1.5;}
+.detail .fact{
+  display:inline-block;
+  margin-top: 0.25rem;
+  margin-right: 0.5rem;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgb(var(--bg));
+  border: 1px solid rgb(var(--line));
+  font-family: ui-monospace, monospace;
+  font-size: 11.5px;
+  color: rgb(var(--fg));
+}
+.detail .go{
+  display:inline-flex; align-items:center; gap: 0.4rem;
+  margin-top: 0.85rem;
+  font-size: 13px; font-weight:500;
+  color: rgb(var(--accent));
+  border-bottom: none;
+}
+
+/* ---------- footer ---------- */
+footer{ margin-top: 5rem; padding-top: 2rem; border-top: 1px solid rgb(var(--line)); font-size: 13px; color: rgb(var(--muted)); max-width: 56rem; display:flex; gap: 2rem; flex-wrap: wrap; justify-content:space-between;}
+footer .links{ display:flex; gap:1rem; flex-wrap:wrap;}
+footer .links a{ color: rgb(var(--muted)); border:none;}
+footer .links a:hover{ color: rgb(var(--accent));}
+
+.theme-toggle{ position: fixed; top: 1rem; right: 1rem; width:34px; height:34px; border-radius:50%; border:1px solid rgb(var(--line)); background:rgb(var(--bg)); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; color: rgb(var(--fg)); z-index: 10;}
+
+.fade{ opacity:0; transform: translateY(10px); transition: opacity .55s ease, transform .55s ease;}
+.fade.in{ opacity:1; transform: none;}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeBtn" aria-label="Toggle theme">◐</button>
+
+<main class="shell">
+
+  <section class="hero fade">
+    <span class="small-caps">Seattle Regulatory RAG · 2026</span>
+    <h1 class="serif">A regulatory question, answered with a <em>real citation</em>.</h1>
+    <p class="lead">A planner runs the numbers on a parking lot. A land-use attorney drafts a memo on middle-housing parking. A policy analyst needs to know where a new state rule preempts local code. Each of them has the same first problem: <strong>which agency's rule actually governs, and what does it literally say.</strong></p>
+    <p class="lead">The rules live across <strong>eight bodies</strong> (WAC, RCW, SMC, Director's Rules, IBC-WA, WA Court Opinions, Governor's Orders, SPU Design Standards), in <span class="mono">5,208</span> PDFs and <span class="mono">89,855</span> sections. They cross-reference each other, contradict each other, and quietly renumber. No human reads them all.</p>
+
+    <div class="byline">
+      <span><span class="dot"></span>&nbsp;v1 · live corpus, real benchmarks</span>
+      <span>·</span>
+      <span>last refreshed: <span class="mono">2026-05-17</span></span>
+    </div>
+  </section>
+
+  <!-- WHY THIS EXISTS -->
+  <section class="why fade">
+    <div>
+      <span class="small-caps">Why this exists</span>
+      <h2 class="serif">The shortcut is to ask a general-purpose model. <em>It guesses.</em></h2>
+      <p class="actor">Pick a question the gold set has scored. <span class="pill">L1-PARK-001</span> dimensions <span class="pill">L4-PARK-001</span> cross-agency <span class="pill">L6-PARK-001</span> false premise</p>
+      <p>Every answer below is a verbatim capture from the real benchmark run on 2026-05-17. The ChatGPT capture is from the public version with no retrieval. This system's capture is from <code class="mono">src.retrieval.hybrid</code> + GPT-5.1 synthesis against the live LanceDB and Kuzu.</p>
+      <p class="muted">The pattern is consistent across the gold set: a public LLM produces fluent prose with confident citations that do not survive a check against the actual PDF. This system answers with text and citations that <strong>did</strong> come from the actual PDF, refuses when retrieval came up empty, and corrects false premises before answering.</p>
+    </div>
+    <div>
+      <div class="cmp" id="cmpWidget">
+        <div class="cmp-tabs" id="cmpTabs"></div>
+        <div class="cmp-head">
+          <span>Same question · same day · two systems</span>
+        </div>
+        <p class="cmp-q" id="cmpQ"></p>
+        <div class="cmp-grid">
+          <div class="cmp-card bad">
+            <div class="cmp-who"><span class="cmp-name">ChatGPT (public, no retrieval)</span><span class="cmp-tag bad" id="cmpTagD">fabricated</span></div>
+            <div class="cmp-ans" id="cmpAnsD"></div>
+            <div class="cmp-cite" id="cmpCiteD"></div>
+          </div>
+          <div class="cmp-card good">
+            <div class="cmp-who"><span class="cmp-name">This system (Arm A · KG-RAG)</span><span class="cmp-tag good" id="cmpTagA">cited</span></div>
+            <div class="cmp-ans" id="cmpAnsA"></div>
+            <div class="cmp-cite" id="cmpCiteA"></div>
+          </div>
+        </div>
+        <div class="cmp-foot" id="cmpFoot"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats strip -->
+  <section class="stats fade">
+    <div class="stat"><div class="v">8</div><div class="l">Agencies</div></div>
+    <div class="stat"><div class="v">5,208</div><div class="l">Documents</div></div>
+    <div class="stat"><div class="v">89,855</div><div class="l">Chunks</div></div>
+    <div class="stat"><div class="v">311,146</div><div class="l">Graph edges</div></div>
+    <div class="stat"><div class="v">71</div><div class="l">Gold-set queries</div></div>
+  </section>
+
+  <!-- Pipeline map -->
+  <section class="fade">
+    <div class="map-head">
+      <h2 class="serif">How the cited answer actually gets built.</h2>
+      <span class="hint"><a href="walkthrough.html" style="border:none;font-weight:500;">End-to-end walkthrough →</a> · or tap any stage to preview</span>
+    </div>
+
+    <div class="pipe" id="pipe">
+      <a class="stage" href="ingestion.html" data-i="0">
+        <div>
+          <span class="num">01 · ingest</span>
+          <h3>Ingestion</h3>
+          <p>Raw agency PDFs (mostly digital, some scanned) parsed with Docling. Tables preserved structurally.</p>
+        </div>
+        <div>
+          <div class="stat-row"><strong>1.23 s</strong>/ page · Docling · TableFormer ACCURATE</div>
+          <span class="open">Open ingestion →</span>
+        </div>
+      </a>
+
+      <a class="stage" href="chunking-embedding.html" data-i="1">
+        <div>
+          <span class="num">02 · chunk + embed</span>
+          <h3>Chunking &amp; Embedding</h3>
+          <p>Per-agency regex chunkers carry citation, content_type, and section title. Vectors from text-embedding-3-large.</p>
+        </div>
+        <div>
+          <div class="stat-row"><strong>3,072 d</strong>· 5 chunks per SMC 23.54.030</div>
+          <span class="open">Open chunking →</span>
+        </div>
+      </a>
+
+      <a class="stage" href="storage.html" data-i="2">
+        <div>
+          <span class="num">03 · store</span>
+          <h3>Storage</h3>
+          <p>LanceDB for hybrid vector + BM25 search. Kuzu (embedded) holds CITES, IMPLEMENTS, NEXT_SECTION edges for graph traversal.</p>
+        </div>
+        <div>
+          <div class="stat-row"><strong>2.6 GB</strong>Lance · <strong>34 MB</strong>Kuzu</div>
+          <span class="open">Open storage →</span>
+        </div>
+      </a>
+
+      <a class="stage" href="retrieval.html" data-i="3">
+        <div>
+          <span class="num">04 · retrieve</span>
+          <h3>Retrieval</h3>
+          <p>Vector + BM25 in parallel, fused linearly (0.55 / 0.45). Kuzu beam expansion for graph context. Real measured traces inside.</p>
+        </div>
+        <div>
+          <div class="stat-row"><strong>6.1 ms</strong>vector · <strong>7.2 ms</strong>BM25 · <strong>1.0 ms</strong>graph</div>
+          <span class="open">Open retrieval →</span>
+        </div>
+      </a>
+
+      <a class="stage" href="synthesis.html" data-i="4">
+        <div>
+          <span class="num">05 · synthesize</span>
+          <h3>Synthesis</h3>
+          <p>GPT-5.1 with a strict citation rubric. Real prompt extracts, premise correction slot, refusal-on-silence rule.</p>
+        </div>
+        <div>
+          <div class="stat-row"><strong>GPT-5.1</strong>· strict <code>[CITATION]</code> brackets</div>
+          <span class="open">Open synthesis →</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Hover detail -->
+    <div class="detail" id="detail">
+      <span class="lbl">Preview</span>
+      <h4 id="detailTitle">Hover or tap a stage</h4>
+      <p id="detailBody">Each page is built from real measurements taken from the live LanceDB, the live Kuzu graph, and a 120-question Round 2 benchmark run. Tap a stage to see what is inside.</p>
+      <div id="detailFacts"></div>
+    </div>
+  </section>
+
+  <!-- Methodology callout -->
+  <section class="method-wrap fade">
+    <div class="map-head" style="margin-bottom: 0.85rem;">
+      <h2 class="serif">And the receipt.</h2>
+      <span class="hint">how every claim above is checked</span>
+    </div>
+    <a class="method" href="methodology.html">
+      <div class="head">
+        <h3>Methodology</h3>
+        <span class="open">Open methodology →</span>
+      </div>
+      <p>A 120-question Round 2 gold set, three arms (KG-RAG, Naive RAG, GPT 5.1 without retrieval), six metrics scored in Python and by an LLM judge, a five-stage human verification chain for every gold answer. Real Arm A / C / D captures for L1-PARK-001 (dimensions), L4-PARK-001 (cross-agency), and L6-PARK-001 (false premise), shown verbatim from the scored run.</p>
+      <div>
+        <span class="fact">120 questions</span>
+        <span class="fact">3 arms</span>
+        <span class="fact">6 metrics</span>
+        <span class="fact">stratified by L1-L6</span>
+        <span class="fact">verbatim PDF check</span>
+      </div>
+    </a>
+  </section>
+
+  <footer>
+    <div>
+      <div class="small-caps" style="margin-bottom: 0.4rem;">Seattle Regulatory RAG</div>
+      <div>Single-page explainers, one per pipeline stage. Each page stands alone with its own measurements and widgets.</div>
+    </div>
+    <div class="links">
+      <a href="walkthrough.html">End-to-end walkthrough</a>
+      <a href="ingestion.html">Ingestion</a>
+      <a href="chunking-embedding.html">Chunking &amp; Embedding</a>
+      <a href="storage.html">Storage</a>
+      <a href="retrieval.html">Retrieval</a>
+      <a href="synthesis.html">Synthesis</a>
+      <a href="methodology.html">Methodology</a>
+    </div>
+  </footer>
+</main>
+
+<script>
+// theme
+function setTheme(t){ if(t==='dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); try{localStorage.setItem('theme',t);}catch(e){} }
+document.getElementById('themeBtn').addEventListener('click', () => setTheme(document.documentElement.classList.contains('dark')?'light':'dark'));
+(function(){try{const s=localStorage.getItem('theme'); if(s)setTheme(s); else if(window.matchMedia('(prefers-color-scheme: dark)').matches)setTheme('dark');}catch(e){}})();
+
+// fade-in
+const io = new IntersectionObserver((entries) => entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }}), { threshold:0.08 });
+document.querySelectorAll('.fade').forEach(el => io.observe(el));
+
+// ---------- stage preview ----------
+// Each stage gets a richer preview rendered into #detail on hover or focus.
+// The card itself remains a link to the full page; the preview is a teaser
+// using the same measurements that appear on the target page.
+const details = [
+  { title: 'Ingestion · Docling parses 8 agency folders',
+    body: 'Per-document run: Docling parses with TableFormer in ACCURATE mode, OCR triggers if text density falls below 50 chars/page. The page shows three real parsers compared on the same 5-page slice of SMC Title 23.',
+    facts: ['Docling 1.23 s/page', 'PyMuPDF4LLM 0.18 s/page', 'pdfplumber 0.10 s/page', 'footer artifacts stripped only by Docling'] },
+  { title: 'Chunking + Embedding · regex first, semchunk fallback',
+    body: 'Eight per-agency chunkers (SMC, WAC, RCW, Director, IBC-WA, SPU, Court Opinions, Governor Orders). Vectors from text-embedding-3-large. The page runs all 4 strategies on the real SMC 23.54.030 text and computes real cosines for 4 chunk pairs across 3 OpenAI embedding models.',
+    facts: ['5 chunks for SMC 23.54.030', '3,072-d vectors', 'real cosine 0.37 vs 0.84 on false-positive pair', '3 OpenAI models compared live'] },
+  { title: 'Storage · LanceDB + Kuzu, both embedded',
+    body: 'LanceDB chunks table has 27 columns (vector + 26 metadata). Kuzu has 3 node tables and 9 edge tables, all carrying confidence:FLOAT. Latency simulator anchored to real measurements at corpus scale.',
+    facts: ['89,855 rows · 27 columns', 'IvfPq + tantivy FTS', '311,146 edges · 9 relation types', '2-hop expand p50 1.0 ms'] },
+  { title: 'Retrieval · vector + BM25 + graph, fused linearly',
+    body: 'Three real traces from src.retrieval.hybrid.retrieve() against the live store. L1-PARK-001 (parking dimensions) and L4-PARK-001 (cross-agency cap) show the gold chunk reliably in the top-5; L6-PARK-001 (false premise) demonstrates the premise-correction path.',
+    facts: ['L1-PARK-001 latency 3.3 s', 'L4-PARK-001 latency 0.53 s', 'L6-PARK-001 latency 2.0 s', 'fusion 0.55/0.45 vector/BM25'] },
+  { title: 'Synthesis · GPT-5.1 with a strict rubric',
+    body: 'Real extracts from src/query/synthesizer.py::SYNTHESIS_SYSTEM_PROMPT, broken into 9 clickable spans. Refusal classifier uses 6 real gold-set questions including L1-PARK-001 (grounded), L5-PARK-009 (refusal pattern), and L6-PARK-001 (premise correction).',
+    facts: ['model: GPT-5.1', 'silence trigger: "Not found in provided sources"', '6 real gold-set patterns', 'premise correction injection slot'] }
+];
+const detail = document.getElementById('detail');
+const dTitle = document.getElementById('detailTitle');
+const dBody = document.getElementById('detailBody');
+const dFacts = document.getElementById('detailFacts');
+const hrefs = ['ingestion.html','chunking-embedding.html','storage.html','retrieval.html','synthesis.html'];
+const niceNames = ['ingestion','chunking + embedding','storage','retrieval','synthesis'];
+function renderDetail(i){
+  if(i === null){
+    dTitle.textContent = 'Hover or tap a stage';
+    dBody.textContent = 'Each page is built from real measurements taken from the live LanceDB, the live Kuzu graph, and a 120-question Round 2 benchmark run. Tap a stage to see what is inside.';
+    dFacts.textContent = '';
+    return;
+  }
+  const d = details[i];
+  dTitle.textContent = d.title;
+  dBody.textContent = d.body;
+  dFacts.textContent = '';
+  d.facts.forEach(f => {
+    const s = document.createElement('span'); s.className = 'fact'; s.textContent = f;
+    dFacts.appendChild(s);
+  });
+  const go = document.createElement('a');
+  go.className = 'go';
+  go.href = hrefs[i];
+  go.textContent = 'Open ' + niceNames[i] + ' →';
+  go.style.display = 'block';
+  dFacts.appendChild(go);
+}
+document.querySelectorAll('.stage').forEach(el => {
+  const i = parseInt(el.dataset.i, 10);
+  el.addEventListener('mouseenter', () => renderDetail(i));
+  el.addEventListener('focus', () => renderDetail(i));
+});
+// On touch devices, single tap previews instead of navigating; second tap navigates.
+let touchPreviewed = -1;
+document.querySelectorAll('.stage').forEach(el => {
+  const i = parseInt(el.dataset.i, 10);
+  el.addEventListener('click', (e) => {
+    if(window.matchMedia('(hover: none)').matches){
+      if(touchPreviewed !== i){
+        e.preventDefault();
+        touchPreviewed = i;
+        renderDetail(i);
+        detail.scrollIntoView({behavior:'smooth', block:'nearest'});
+      }
+    }
+  });
+});
+renderDetail(null);
+
+// ---------- compare widget (real captures from Round 2 benchmark run) ----------
+// All answers below are verbatim from benchmarks/round_2/runs/full/runs.jsonl.
+// Highlighting: .miss = wrong vs gold; .match = matches gold. Plain text = unchecked.
+const compares = [
+  {
+    id: 'L1-PARK-001', label: 'L1-PARK-001 · dimensions',
+    q: 'Under SMC 23.54.030, what is the minimum width of a "medium vehicle" parking space?',
+    gold: '8 feet. SMC 23.54.030.A.2: "the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length."',
+    d: {
+      tag: 'wrong number',
+      segments: [
+        {k:'plain', t:'Under SMC 23.54.030 (Parking space standards), the minimum width for a "medium vehicle" parking space is '},
+        {k:'miss', t:'8 feet 6 inches (8.5 feet).'}
+      ],
+      cite: 'cites SMC 23.54.030 (real section, wrong number)'
+    },
+    a: {
+      tag: 'cited · exact',
+      segments: [
+        {k:'plain', t:'Under SMC 23.54.030.A.2, a "medium vehicle" parking space must be at least '},
+        {k:'match', t:'8 feet in width.'}
+      ],
+      cite: 'cites SMC 23.54.030 + Title 11 supporting sections'
+    },
+    foot: 'Both systems cite the correct section. This system reads the actual text and reports 8 feet. GPT-5.1 cites the same section but states 8.5 feet — a number that contradicts the very source it cites. The reader who trusts the citation does not notice the contradiction.'
+  },
+  {
+    id: 'L4-PARK-001', label: 'L4-PARK-001 · cross-agency',
+    q: 'A middle-housing project sits on an 8,000 sq ft lot with 4 units. Per RCW 36.70A.635(6)(f), what is the maximum total off-street parking the city may require?',
+    gold: '8 spaces. RCW 36.70A.635(6)(f): "max 2 spaces per unit on lots greater than 6,000 sq ft." 4 units × 2 = 8.',
+    d: {
+      tag: 'wrong cap',
+      segments: [
+        {k:'plain', t:'Per RCW 36.70A.635(6)(f), for middle housing on lots greater than 6,000 sq ft, a city may not require more than '},
+        {k:'miss', t:'1 off-street parking space per dwelling unit. → 4 units × 1 = 4 spaces.'}
+      ],
+      cite: 'cites RCW 36.70A.635(6) (real section, wrong per-unit cap)'
+    },
+    a: {
+      tag: 'cited · correct',
+      segments: [
+        {k:'plain', t:'The lot is greater than 6,000 sq ft, so the applicable cap is no more than two off-street parking spaces per unit. Therefore, '},
+        {k:'match', t:'the maximum total is 8 spaces (4 units × 2).'}
+      ],
+      cite: 'cites RCW 36.70A.635 + neighbouring growth-management sections'
+    },
+    foot: 'Multi-step reasoning: lot size triggers the bracket; bracket fixes the per-unit cap; arithmetic produces the total. Both arms surface the correct subsection. This system reads it and applies the correct 2-space cap. GPT-5.1 mis-remembers the cap as 1 instead of 2, then propagates that error through the arithmetic.'
+  },
+  {
+    id: 'L6-PARK-001', label: 'L6-PARK-001 · false premise',
+    q: 'Since SMC 23.54.030.L.2.a sets the EV-Ready requirement for nonresidential parking at 10 percent of spaces, what minimum percentage applies (without exception)?',
+    gold: '30 percent. The 10% premise in the question is FALSE — SMC 23.54.030.L.2.a actually requires "a minimum of 30 percent of those spaces shall be EV-ready."',
+    d: {
+      tag: 'accepts false premise',
+      segments: [
+        {k:'plain', t:'Under SMC 23.54.030.L.2.a, the baseline requirement for nonresidential EV-Ready spaces is '},
+        {k:'miss', t:'10% of total off-street parking spaces. → 10 percent.'}
+      ],
+      cite: 'cites SMC 23.54.030.L.2 (cited section actually says 30%, not 10%)'
+    },
+    a: {
+      tag: 'corrected · grounded',
+      segments: [
+        {k:'plain', t:'The minimum EV-ready requirement for nonresidential parking is '},
+        {k:'match', t:'30 percent of spaces, because SMC 23.54.030.L.2.a states a minimum of 30 percent of those spaces shall be EV-ready, except as modified by .2.b and .2.c.'}
+      ],
+      cite: 'cites SMC 23.54.030 + L.2 subsection neighbours'
+    },
+    foot: 'The question encodes a wrong number (10%). A grounded answer reads the cited section and surfaces the actual 30%. GPT-5.1 accepts the planted premise and parrots it back as the answer — while citing the exact section whose text proves it wrong. Worst failure mode on a regulatory trap.'
+  }
+];
+const cmpTabs = document.getElementById('cmpTabs');
+const cmpQ = document.getElementById('cmpQ');
+const cmpAnsD = document.getElementById('cmpAnsD');
+const cmpAnsA = document.getElementById('cmpAnsA');
+const cmpCiteD = document.getElementById('cmpCiteD');
+const cmpCiteA = document.getElementById('cmpCiteA');
+const cmpTagD = document.getElementById('cmpTagD');
+const cmpTagA = document.getElementById('cmpTagA');
+const cmpFoot = document.getElementById('cmpFoot');
+function paintAns(target, segments){
+  target.textContent = '';
+  segments.forEach(seg => {
+    const span = document.createElement('span');
+    if(seg.k === 'miss') span.className = 'miss';
+    else if(seg.k === 'match') span.className = 'match';
+    span.textContent = seg.t;
+    target.appendChild(span);
+  });
+}
+function renderCmp(i){
+  const c = compares[i];
+  cmpQ.textContent = '"' + c.q + '"';
+  paintAns(cmpAnsD, c.d.segments);
+  paintAns(cmpAnsA, c.a.segments);
+  cmpCiteD.textContent = c.d.cite;
+  cmpCiteA.textContent = c.a.cite;
+  cmpTagD.textContent = c.d.tag;
+  cmpTagA.textContent = c.a.tag;
+  cmpFoot.textContent = c.foot;
+  cmpTabs.querySelectorAll('.cmp-tab').forEach((el, j) => el.classList.toggle('active', j === i));
+}
+compares.forEach((c, i) => {
+  const b = document.createElement('button');
+  b.className = 'cmp-tab' + (i === 0 ? ' active' : '');
+  b.textContent = c.label;
+  b.addEventListener('click', () => renderCmp(i));
+  cmpTabs.appendChild(b);
+});
+renderCmp(0);
+</script>
+</body>
+</html>

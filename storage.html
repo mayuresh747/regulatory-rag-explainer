@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Storage · Seattle Regulatory RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:252 250 246;--fg:28 25 23;--muted:87 83 78;--subtle:245 242 236;--line:220 215 207;--accent:217 119 6;--accent-soft:254 243 199;--good:22 101 52;--good-soft:220 240 226;--bad:153 27 27;--bad-soft:248 219 214;}
+html.dark{--bg:24 22 20;--fg:244 241 235;--muted:168 162 154;--subtle:36 33 30;--line:60 56 52;--accent:251 191 36;--accent-soft:68 50 18;--good:134 239 172;--good-soft:28 50 38;--bad:252 165 165;--bad-soft:60 30 28;}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:rgb(var(--bg));color:rgb(var(--fg));font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased;font-feature-settings:'ss01','cv11';}
+.serif{font-family:'Fraunces',Georgia,serif;font-feature-settings:'ss01';letter-spacing:-0.01em;}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;}
+.small-caps{font-family:'Inter',sans-serif;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgb(var(--muted));font-weight:500;}
+hr.rule{border:none;border-top:1px solid rgb(var(--line));margin:5rem 0;}
+.shell{max-width:72rem;margin:0 auto;padding:2.5rem 1.5rem 6rem;display:grid;grid-template-columns:1fr;gap:2rem;}
+@media(min-width:1024px){.shell{grid-template-columns:14rem 1fr;gap:4rem;padding-top:4rem;}}
+.toc-wrap{display:none;}
+@media(min-width:1024px){.toc-wrap{display:block;position:sticky;top:3rem;align-self:start;max-height:calc(100vh - 4rem);overflow:auto;}}
+.toc{list-style:none;padding:0;margin:0;}
+.toc li{margin:0.55rem 0;}
+.toc a{border:none;color:rgb(var(--muted));font-size:13px;display:flex;gap:0.6rem;transition:color .2s;text-decoration:none;}
+.toc a .num{font-variant-numeric:tabular-nums;opacity:0.55;min-width:1.4rem;}
+.toc a.active{color:rgb(var(--fg));font-weight:500;}
+.toc a.active .num{color:rgb(var(--accent));opacity:1;}
+.toc a:hover{color:rgb(var(--fg));}
+.toc-head{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgb(var(--muted));margin-bottom:1.25rem;}
+.col{max-width:36rem;}
+.hero h1{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(2.4rem,5vw,3.4rem);line-height:1.05;letter-spacing:-0.025em;margin:1rem 0 1.25rem;}
+.hero p.lead{font-size:1.1rem;color:rgb(var(--muted));max-width:32rem;}
+.byline{display:flex;gap:1.25rem;align-items:center;font-size:13px;color:rgb(var(--muted));margin-top:2.25rem;padding-top:1.5rem;border-top:1px solid rgb(var(--line));flex-wrap:wrap;}
+.dot{width:6px;height:6px;border-radius:50%;background:rgb(var(--accent));display:inline-block;}
+section.chapter{scroll-margin-top:4rem;padding:5rem 0 0;}
+section.chapter h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(1.7rem,3vw,2.1rem);letter-spacing:-0.02em;line-height:1.15;margin:0.5rem 0 1.5rem;max-width:32rem;}
+section.chapter p{max-width:36rem;margin:0 0 1.25rem;}
+section.chapter .small-caps{display:block;margin-bottom:0.5rem;}
+.surface{max-width:56rem;border:1px solid rgb(var(--line));background:rgb(var(--bg));border-radius:14px;padding:1.5rem;margin:2rem 0 2.5rem;}
+.surface .surface-head{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(var(--muted));margin-bottom:1rem;gap:1rem;}
+.surface .surface-head .badge{font-family:ui-monospace,monospace;letter-spacing:0;text-transform:none;padding:2px 8px;border-radius:999px;background:rgb(var(--subtle));color:rgb(var(--fg));font-size:11px;}
+code.mono{font-family:ui-monospace,monospace;font-size:13px;padding:1px 5px;background:rgb(var(--subtle));border-radius:4px;border:1px solid rgb(var(--line) / 0.7);}
+.theme-toggle{position:fixed;top:1rem;right:1rem;width:34px;height:34px;border-radius:50%;border:1px solid rgb(var(--line));background:rgb(var(--bg));cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgb(var(--fg));z-index:10;}
+footer{margin-top:7rem;padding-top:2rem;border-top:1px solid rgb(var(--line));font-size:13px;color:rgb(var(--muted));max-width:42rem;}
+.fade{opacity:0;transform:translateY(12px);transition:opacity .7s ease,transform .7s ease;}
+.fade.in{opacity:1;transform:none;}
+
+.fact-list{display:grid;gap:8px;}
+.fact{border:1px solid rgb(var(--line));border-radius:10px;background:rgb(var(--bg));padding:0.95rem 1.1rem;}
+.fact-head{display:flex;justify-content:space-between;gap:0.6rem;align-items:baseline;margin-bottom:0.5rem;}
+.fact-name{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:500;letter-spacing:-0.005em;}
+.fact-tag{font-family:ui-monospace,monospace;font-size:10.5px;padding:2px 8px;border-radius:999px;background:rgb(var(--subtle));color:rgb(var(--muted));flex-shrink:0;}
+.fact-tag.ours{background:rgb(var(--good-soft));color:rgb(var(--good));font-weight:500;}
+.fact-body{font-size:14px;color:rgb(var(--fg));line-height:1.55;}
+
+/* widget 1: schema browser */
+.sb-tabs{display:flex;gap:0;border-bottom:1px solid rgb(var(--line));margin-bottom:1.25rem;flex-wrap:wrap;}
+.sb-tab{padding:0.65rem 1rem;cursor:pointer;font-size:12.5px;font-family:'Inter',sans-serif;color:rgb(var(--muted));border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;user-select:none;display:inline-flex;align-items:center;gap:6px;}
+.sb-tab:hover{color:rgb(var(--fg));}
+.sb-tab.active{color:rgb(var(--accent));border-bottom-color:rgb(var(--accent));font-weight:500;}
+.sb-tab .sb-pill{font-family:ui-monospace,monospace;font-size:10.5px;padding:1px 6px;border-radius:4px;background:rgb(var(--subtle));color:rgb(var(--muted));}
+.sb-tab.active .sb-pill{background:rgb(var(--accent-soft));color:rgb(var(--accent));}
+.sb-card{border:1px solid rgb(var(--line));border-radius:10px;background:rgb(var(--bg));padding:1.25rem;}
+.sb-name{font-family:'Fraunces',serif;font-size:1.3rem;font-weight:500;margin-bottom:0.3rem;}
+.sb-sub{font-size:13px;color:rgb(var(--muted));margin-bottom:1rem;}
+.sb-fields{display:grid;gap:6px;}
+.sb-field{display:grid;grid-template-columns:200px 100px 1fr;gap:1rem;padding:0.6rem 0.85rem;background:rgb(var(--subtle) / 0.5);border-radius:6px;align-items:baseline;font-size:13px;}
+@media (max-width: 580px){ .sb-field{grid-template-columns:1fr;gap:0.25rem;}}
+.sb-fname{font-family:ui-monospace,monospace;font-size:12.5px;color:rgb(var(--fg));}
+.sb-ftype{font-family:ui-monospace,monospace;font-size:11px;color:rgb(var(--accent));padding:1px 7px;background:rgb(var(--accent-soft));border-radius:4px;width:fit-content;}
+.sb-fdesc{font-size:12.5px;color:rgb(var(--muted));line-height:1.5;}
+.sb-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:1.25rem;}
+@media (max-width: 580px){ .sb-stats{grid-template-columns:1fr;}}
+.sb-stat{padding:0.65rem 0.85rem;background:rgb(var(--subtle));border-radius:8px;}
+.sb-stat-l{font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgb(var(--muted));font-weight:500;}
+.sb-stat-v{font-family:'Fraunces',serif;font-size:1.5rem;font-weight:500;margin-top:2px;line-height:1.1;}
+
+/* widget 2: latency simulator */
+.lat-row{display:flex;align-items:center;gap:12px;margin-bottom:1rem;}
+.lat-mono{font-family:ui-monospace,monospace;font-size:11.5px;color:rgb(var(--muted));white-space:nowrap;}
+.lat-slider{flex:1;appearance:none;-webkit-appearance:none;height:6px;border-radius:3px;background:rgb(var(--subtle));outline:none;cursor:pointer;}
+.lat-slider::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:rgb(var(--accent));cursor:pointer;border:2px solid rgb(var(--bg));box-shadow:0 1px 3px rgb(0 0 0 / 0.15);}
+.lat-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:rgb(var(--accent));cursor:pointer;border:2px solid rgb(var(--bg));}
+.lat-current{display:inline-flex;align-items:baseline;gap:4px;min-width:130px;padding:4px 10px;background:rgb(var(--accent-soft));border-radius:6px;font-family:'Fraunces',serif;font-size:1.05rem;font-weight:500;color:rgb(var(--accent));white-space:nowrap;}
+.lat-current .lat-mono{color:rgb(var(--accent));font-size:11px;}
+.lat-presets{display:flex;gap:6px;margin-bottom:1.1rem;flex-wrap:wrap;}
+.lat-preset{font-family:'Inter',sans-serif;font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid rgb(var(--line));background:rgb(var(--bg));cursor:pointer;color:rgb(var(--muted));transition:all .15s;}
+.lat-preset:hover{color:rgb(var(--fg));}
+.lat-preset.active{background:rgb(var(--accent-soft));border-color:rgb(var(--accent));color:rgb(var(--accent));font-weight:500;}
+.lat-bars{display:grid;gap:10px;margin:1.25rem 0;}
+.lat-bar-row{display:grid;grid-template-columns:130px 1fr 80px;gap:12px;align-items:center;}
+@media (max-width: 580px){ .lat-bar-row{grid-template-columns:1fr;}}
+.lat-bar-name{font-family:'Inter',sans-serif;font-size:13px;color:rgb(var(--fg));}
+.lat-bar-track{height:22px;background:rgb(var(--subtle));border-radius:4px;overflow:hidden;}
+.lat-bar-fill{height:100%;background:rgb(var(--accent));border-radius:4px;transition:width 0.5s cubic-bezier(.22,.61,.36,1);}
+.lat-bar-fill.ok{background:rgb(var(--good));}
+.lat-bar-fill.warn{background:rgb(var(--accent));}
+.lat-bar-fill.bad{background:rgb(var(--bad));}
+.lat-bar-val{font-family:ui-monospace,monospace;font-size:13px;text-align:right;color:rgb(var(--fg));}
+.lat-note{padding:0.85rem 1rem;background:rgb(var(--subtle));border-left:3px solid rgb(var(--accent));border-radius:0 8px 8px 0;font-size:13.5px;line-height:1.55;}
+.lat-note .lbl{font-family:ui-monospace,monospace;font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(var(--accent));margin-right:0.5rem;font-weight:600;}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeBtn" aria-label="Toggle theme">◐</button>
+<div class="shell">
+  <aside class="toc-wrap">
+    <div class="toc-head">Contents</div>
+    <ul class="toc" id="toc">
+      <li><a href="#why"><span class="num">01</span><span>Why two databases</span></a></li>
+      <li><a href="#lance"><span class="num">02</span><span>LanceDB</span></a></li>
+      <li><a href="#kuzu"><span class="num">03</span><span>Kuzu</span></a></li>
+      <li><a href="#alts"><span class="num">04</span><span>What we rejected</span></a></li>
+      <li><a href="#schema"><span class="num">05</span><span>Schema browser</span></a></li>
+      <li><a href="#latency"><span class="num">06</span><span>Latency simulator</span></a></li>
+    </ul>
+  </aside>
+  <main>
+    <header class="hero col">
+      <div class="small-caps"><span class="dot"></span>&nbsp;&nbsp;Seattle Regulatory RAG · Storage</div>
+      <h1 class="serif">Storage</h1>
+      <p class="lead">Two embedded databases, no server. LanceDB holds chunks plus their vectors and BM25 index. Kuzu holds the relationships between them.</p>
+      <div class="byline">
+        <span>LanceDB · chunks + vectors + BM25</span><span>·</span><span>Kuzu · graph</span><span>·</span><span>both embedded</span>
+      </div>
+    </header>
+
+    <section id="why" class="chapter">
+      <span class="small-caps">01 · Why two databases</span>
+      <h2 class="serif">Different queries, different shapes</h2>
+      <p>Vector and BM25 retrieval are best served by a columnar store with a vector index. Graph traversals (cross-references, "see also" edges, parent/child sections) are best served by a graph database. Trying to do both in one engine costs performance on at least one of them.</p>
+      <p>So the architecture splits cleanly. LanceDB owns the chunk text, the embedding vectors, the BM25 index, and the per-chunk metadata. Kuzu owns the relationships: which chunks cross-reference which, which definitions an entity resolves to, which prior versions a section supersedes. Each query goes to whichever store fits.</p>
+    </section>
+
+    <section id="lance" class="chapter">
+      <span class="small-caps">02 · LanceDB</span>
+      <h2 class="serif">Chunks, vectors, BM25</h2>
+      <p>Every chunk written by the per-agency chunkers lands in a LanceDB table. The text column stores the raw chunk; the vector column stores the 3072-dimensional embedding from <code class="mono">text-embedding-3-large</code>; a tantivy-backed BM25 index runs over the text column. Metadata fields (citation, section title, agency, content type, table flag) are searchable and filterable.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Why LanceDB</span><span class="badge">picked v1</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Hybrid in one engine</span><span class="fact-tag ours">vector + BM25 native</span></div>
+            <div class="fact-body">Both retrievers query the same store, returning Arrow batches. No second service to keep in sync. The hybrid lift comes for free at query time.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Embedded · no server</span><span class="fact-tag">zero ops</span></div>
+            <div class="fact-body">Reads and writes go through a Python or Rust process. No daemon, no port, no separate deployment. The data lives next to the code as Lance-format files on disk.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Measured latency</span><span class="fact-tag">at 89,855 chunks</span></div>
+            <div class="fact-body">Real measurements taken 2026-05-17 on the production index: vector top-70 = 6.1 ms p50 / 7.9 ms p95, BM25 (FTS, tantivy) top-70 = 7.2 ms p50 / 8.5 ms p95, vector with agency-filter = 9.0 ms p50. Hybrid fusion adds about 1-2 ms. Raw numbers in <code class="mono">docs/explainers/results/storage_stats.json</code>.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Batch inserts critical</span><span class="fact-tag">ingestion gotcha</span></div>
+            <div class="fact-body">Inserting chunks one at a time blows up storage size by writing many small Lance fragments. The ingestion pipeline batches into 1000-chunk inserts; this matters more than vector index choice.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="kuzu" class="chapter">
+      <span class="small-caps">03 · Kuzu</span>
+      <h2 class="serif">The graph layer</h2>
+      <p>Every chunk is also a node in Kuzu. Edges encode the relationships that vector similarity cannot capture: explicit cross-references ("see also SMC 23.54.020"), parent and child sections, prior versions of a renumbered rule, and links from regulatory entities to their canonical definition.</p>
+      <p>At query time the graph is traversed only after retrieval has narrowed the candidate set to about 5 chunks. Each is expanded by 2 hops, capped to about 5 added nodes per query. The fan-out is bounded; the cost is paid only when graph context actually helps.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Why Kuzu</span><span class="badge">picked v1</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Embedded graph DB</span><span class="fact-tag ours">no server</span></div>
+            <div class="fact-body">Same model as LanceDB: a library that opens a database file. No separate process, no clustering setup, no operator overhead.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Fast path queries</span><span class="fact-tag">measured</span></div>
+            <div class="fact-body">2-hop expansion across CITES, IMPLEMENTS, DEFINED_BY, SUBJECT_TO, AMENDED_BY measured on the live graph (95,071 nodes, 311,146 edges): p50 = 1.0 ms, p95 = 4.2 ms, max = 6.1 ms over 30 random starting chunks. Independent published benchmarks put Kuzu roughly 300x faster than Neo4j on similar 2-hop workloads.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Vela fork</span><span class="fact-tag">production multi-writer</span></div>
+            <div class="fact-body">Original Kuzu was archived in late 2025. We use the Vela-Engineering community fork, which adds production multi-writer support and continues active maintenance.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="alts" class="chapter">
+      <span class="small-caps">04 · What we rejected</span>
+      <h2 class="serif">Alternatives and why not</h2>
+      <div class="surface">
+        <div class="surface-head"><span>Vector stores considered</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Pinecone</span><span class="fact-tag">SaaS only</span></div>
+            <div class="fact-body">Excellent at scale, but a hosted service with monthly minimums and data egress. Our corpus fits on a laptop. The operational complexity is unjustified at this size.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Weaviate</span><span class="fact-tag">server required</span></div>
+            <div class="fact-body">Strong hybrid search, well-designed schema. But the operational footprint (Docker, persistent volume, schema migrations) is a step backward from embedded.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Chroma</span><span class="fact-tag">no native hybrid</span></div>
+            <div class="fact-body">Easy to start. Hybrid search requires bolting BM25 on yourself. LanceDB ships hybrid as first-class.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">pgvector</span><span class="fact-tag">Postgres add-on</span></div>
+            <div class="fact-body">Fine if you already run Postgres for other reasons. We don't, and adding it just for vectors brings a database we'd otherwise not need.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Neo4j</span><span class="fact-tag">graph alternative</span></div>
+            <div class="fact-body">Industry standard, but heavy at this scale: separate server, JVM, slower path queries than Kuzu in our benchmarks. Defaults to too much for what we need.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="schema" class="chapter">
+      <span class="small-caps">05 · Schema browser</span>
+      <h2 class="serif">What's actually stored</h2>
+      <p>Click between the LanceDB chunk schema, the Kuzu node schema, and the Kuzu edge schema to see fields and types.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Schema</span><span class="badge" id="sbBadge">LanceDB chunks</span></div>
+        <div class="sb-tabs" id="sbTabs">
+          <div class="sb-tab active" data-s="0">LanceDB chunk<span class="sb-pill">table</span></div>
+          <div class="sb-tab" data-s="1">Kuzu node<span class="sb-pill">graph</span></div>
+          <div class="sb-tab" data-s="2">Kuzu edge<span class="sb-pill">graph</span></div>
+        </div>
+        <div class="sb-card" id="sbCard"></div>
+      </div>
+    </section>
+
+    <section id="latency" class="chapter">
+      <span class="small-caps">06 · Latency simulator</span>
+      <h2 class="serif">Latency at corpus scale</h2>
+      <p>Slide the corpus size and see expected p50 latencies for the four storage operations. The "current" preset (5,208 docs, 89,855 chunks) shows real measurements taken 2026-05-17: vector top-70 = 6.1 ms, BM25 (FTS / tantivy) top-70 = 7.2 ms, Kuzu 2-hop expansion = 1.0 ms, rerank stays a constant overhead at the LLM. Larger corpus sizes are extrapolated using IvfPq's sub-linear scaling and tantivy's near-linear scaling.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Latency simulator</span><span class="badge">p50 estimates</span></div>
+        <div class="lat-presets" id="latPresets">
+          <button class="lat-preset" data-c="5208">5.2k docs · measured</button>
+          <button class="lat-preset" data-c="20000">20k docs · 4×</button>
+          <button class="lat-preset" data-c="50000">50k docs · 10×</button>
+          <button class="lat-preset" data-c="200000">200k docs · 38×</button>
+        </div>
+        <div class="lat-row">
+          <span class="lat-mono">1k</span>
+          <input type="range" id="latSlider" min="1000" max="200000" step="500" value="5208" class="lat-slider"/>
+          <span class="lat-mono">200k</span>
+          <div class="lat-current"><span id="latVal">5,208</span><span class="lat-mono">docs</span></div>
+        </div>
+        <div class="lat-bars" id="latBars"></div>
+        <div class="lat-note"><span class="lbl">Read</span><span id="latNote"></span></div>
+      </div>
+    </section>
+
+    <hr class="rule" />
+    <footer><p style="margin-top:1.5rem;" class="small-caps">Seattle Regulatory RAG · Storage · 2026</p></footer>
+  </main>
+</div>
+<script>
+// theme
+function setTheme(t){ if(t==='dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); try{localStorage.setItem('theme',t);}catch(e){} }
+document.getElementById('themeBtn').addEventListener('click', () => setTheme(document.documentElement.classList.contains('dark')?'light':'dark'));
+(function(){try{const s=localStorage.getItem('theme'); if(s)setTheme(s); else if(window.matchMedia('(prefers-color-scheme: dark)').matches)setTheme('dark');}catch(e){}})();
+
+// ---------- WIDGET 1: SCHEMA BROWSER ----------
+// Real schemas read from the live LanceDB chunks table and Kuzu graph on
+// 2026-05-17. Field lists below match `tbl.schema` and Kuzu CALL TABLE_INFO()
+// output exactly. Row counts measured the same day; raw numbers in
+// docs/explainers/results/storage_stats.json.
+const schemas = [
+  { name:'chunks', label:'LanceDB chunks table', sub:'One row per chunk produced by the per-agency chunkers. 27 columns total: the vector, the raw text, and 25 metadata fields. Searchable by vector (IvfPq), by BM25 (FTS / tantivy), and by every metadata column.',
+    fields:[
+      { n:'id', t:'string', d:'UUID primary key. Same id is reused as the Kuzu Chunk node id.' },
+      { n:'text', t:'string', d:'Chunk text after normalization. The FTS index runs over this column.' },
+      { n:'embedding', t:'float32[3072]', d:'text-embedding-3-large vector. IvfPq-indexed for fast cosine search.' },
+      { n:'agency', t:'string', d:'One of the 8 agency keys (SMC, WAC, RCW, Seattle DIR, IBC-WA, SPU, WA Court Opinions, Governor Orders).' },
+      { n:'document_type', t:'string', d:'Coarse type, e.g. statute, opinion, rule, design_standard.' },
+      { n:'filename', t:'string', d:'Source PDF filename. Used for traceability back to the disk artifact.' },
+      { n:'citation', t:'string', d:'Canonical citation. Example: "SMC 23.54.030" or "WAC 365-196-875".' },
+      { n:'section_number', t:'string', d:'Just the section number, no prefix. Example: "23.54.030".' },
+      { n:'subsection_id', t:'string?', d:'When sub-chunked, the sub-section identifier. Example: "23.54.030_part3".' },
+      { n:'section_title', t:'string?', d:'Human-readable section heading.' },
+      { n:'authority_level', t:'string', d:'state_statute, state_rule, local_statute, local_rule, opinion, executive_order, design_standard.' },
+      { n:'jurisdiction', t:'string', d:'WA, Seattle, etc.' },
+      { n:'effective_date', t:'string?', d:'When the section took effect; nullable.' },
+      { n:'last_amended_date', t:'string?', d:'Last amendment year extracted from ordinance history; nullable.' },
+      { n:'is_table', t:'bool', d:'True if the chunk contains Markdown table syntax. 512 of 89,855 rows.' },
+      { n:'table_type', t:'string?', d:'dimensional, fee_schedule, zoning, other.' },
+      { n:'parent_section', t:'string?', d:'Parent section identifier for hierarchical retrieval. Example: "SMC 23.54".' },
+      { n:'chunk_index', t:'int64', d:'Ordinal position within the source document.' },
+      { n:'content_type', t:'string', d:'substantive, definition, case_caption, preface, specification, cross_reference_index, header_metadata, fallback.' },
+      { n:'key_terms', t:'string', d:'Comma-joined extracted terms; informational, not heavily relied on.' },
+      { n:'has_images', t:'bool', d:'True if the source PDF had image artifacts that survived normalization.' },
+      { n:'metadata_json', t:'string', d:'Free-form per-agency metadata serialized as JSON.' },
+      { n:'is_scanned', t:'bool', d:'True if the source PDF was scanned (Docling OCR fallback fired).' },
+      { n:'ocr_confidence', t:'double?', d:'Average Docling OCR confidence; only set when is_scanned=true.' },
+      { n:'version', t:'int64', d:'Versioning for re-ingestion. Lets retrieval prefer the newest copy.' },
+      { n:'deprecated', t:'bool', d:'Soft-delete flag. Retrieval filters out deprecated rows by default.' },
+      { n:'created_at', t:'string', d:'ISO timestamp of insert.' }
+    ],
+    stats:[ {l:'rows', v:'89,855'}, {l:'vector index', v:'IvfPq · 3072 d'}, {l:'text index', v:'FTS (tantivy)'}, {l:'on disk', v:'2.6 GB'} ]
+  },
+  { name:'nodes', label:'Kuzu node tables', sub:'Three node tables. AgencyNode and DocumentNode anchor the corpus structure; Chunk holds the same ids as LanceDB rows. The graph carries minimal denormalized fields so traversals stay cheap; full chunk text stays in LanceDB.',
+    fields:[
+      { n:'AgencyNode.id', t:'STRING', d:'Agency key. Example: "SMC", "WAC". 8 nodes total.' },
+      { n:'AgencyNode.label', t:'STRING', d:'Display name. Example: "Seattle Municipal Code".' },
+      { n:'AgencyNode.authority_level', t:'STRING', d:'state_statute, local_statute, etc.' },
+      { n:'DocumentNode.id', t:'STRING', d:'PDF filename or doc id. 5,208 nodes.' },
+      { n:'DocumentNode.agency', t:'STRING', d:'Owning agency key.' },
+      { n:'DocumentNode.label', t:'STRING', d:'Display name for the document.' },
+      { n:'Chunk.id', t:'STRING', d:'Same UUID used as the LanceDB row id. 89,855 nodes.' },
+      { n:'Chunk.agency', t:'STRING', d:'Owning agency key.' },
+      { n:'Chunk.citation', t:'STRING', d:'Canonical citation, e.g. "SMC 23.54.030".' },
+      { n:'Chunk.section_number', t:'STRING', d:'Just the section number.' },
+      { n:'Chunk.authority_level', t:'STRING', d:'Mirrors the LanceDB column for filterable traversal.' },
+      { n:'Chunk.document_type', t:'STRING', d:'Mirrors LanceDB document_type.' },
+      { n:'Chunk.filename', t:'STRING', d:'Source PDF filename.' },
+      { n:'Chunk.chunk_index', t:'INT64', d:'Ordinal position within source document.' },
+      { n:'Chunk.deprecated', t:'INT8', d:'Soft-delete flag.' }
+    ],
+    stats:[ {l:'AgencyNode', v:'8'}, {l:'DocumentNode', v:'5,208'}, {l:'Chunk', v:'89,855'}, {l:'total nodes', v:'95,071'} ]
+  },
+  { name:'edges', label:'Kuzu edge tables', sub:'Nine relationship types. Every edge carries a single confidence:FLOAT property. Edges are direction-typed in Cypher. CONFLICTS_WITH is intentionally empty: the project rejected runtime-LLM conflict adjudication; conflicts surface at synthesis time from co-citations and amendment chains.',
+    fields:[
+      { n:'AGENCY_HAS_DOC', t:'AgencyNode → DocumentNode', d:'Ownership edge. Exactly one per document. 5,208 edges.' },
+      { n:'DOC_HAS_CHUNK', t:'DocumentNode → Chunk', d:'Containment edge. One per chunk. 89,855 edges.' },
+      { n:'NEXT_SECTION', t:'Chunk → Chunk', d:'Sequential reading order within a document. 84,647 edges; nearly chunk-count, so most chunks have a neighbor.' },
+      { n:'CITES', t:'Chunk → Chunk', d:'Explicit "see also" or "as defined in" reference. Extracted by per-agency regex + LLM cross-reference resolver. 33,764 edges.' },
+      { n:'IMPLEMENTS', t:'Chunk → Chunk', d:'Local rule implements state statute. WAC → RCW, SMC → WAC, etc. 58,638 edges, the largest cross-agency relation.' },
+      { n:'DEFINED_BY', t:'Chunk → Chunk', d:'Term defined elsewhere. Used to expand a query that mentions a defined regulatory term. 4,768 edges.' },
+      { n:'SUBJECT_TO', t:'Chunk → Chunk', d:'Activity subject to additional standards in another section. 33,424 edges.' },
+      { n:'AMENDED_BY', t:'Chunk → Chunk', d:'Old version superseded by new. Lets retrieval pick the live rule. 842 edges (sparse, most ordinance history is captured as last_amended_date, not as a separate AMENDED_BY chunk).' },
+      { n:'CONFLICTS_WITH', t:'Chunk → Chunk', d:'Reserved relation; currently empty by design.' },
+      { n:'(property)', t:'confidence:FLOAT', d:'Every edge carries a confidence score 0-1. Regex-extracted edges are 1.0; LLM-inferred edges carry the model\'s self-reported confidence.' }
+    ],
+    stats:[ {l:'total edges', v:'311,146'}, {l:'measured 2-hop p50', v:'1.0 ms'}, {l:'measured 2-hop p95', v:'4.2 ms'}, {l:'on disk', v:'34 MB'} ]
+  }
+];
+const sbTabs = document.getElementById('sbTabs');
+const sbCard = document.getElementById('sbCard');
+const sbBadge = document.getElementById('sbBadge');
+function renderSB(i){
+  sbTabs.querySelectorAll('.sb-tab').forEach((el,j) => el.classList.toggle('active', j===i));
+  const s = schemas[i];
+  sbBadge.textContent = s.label;
+  sbCard.textContent = '';
+  const nm = document.createElement('div'); nm.className = 'sb-name'; nm.textContent = s.label;
+  sbCard.appendChild(nm);
+  const sub = document.createElement('div'); sub.className = 'sb-sub'; sub.textContent = s.sub;
+  sbCard.appendChild(sub);
+  const fields = document.createElement('div'); fields.className = 'sb-fields';
+  s.fields.forEach(f => {
+    const row = document.createElement('div'); row.className = 'sb-field';
+    const fn = document.createElement('span'); fn.className = 'sb-fname'; fn.textContent = f.n;
+    const ft = document.createElement('span'); ft.className = 'sb-ftype'; ft.textContent = f.t;
+    const fd = document.createElement('span'); fd.className = 'sb-fdesc'; fd.textContent = f.d;
+    row.appendChild(fn); row.appendChild(ft); row.appendChild(fd);
+    fields.appendChild(row);
+  });
+  sbCard.appendChild(fields);
+  const stats = document.createElement('div'); stats.className = 'sb-stats';
+  s.stats.forEach(st => {
+    const sd = document.createElement('div'); sd.className = 'sb-stat';
+    const l = document.createElement('div'); l.className = 'sb-stat-l'; l.textContent = st.l;
+    const v = document.createElement('div'); v.className = 'sb-stat-v'; v.textContent = st.v;
+    sd.appendChild(l); sd.appendChild(v);
+    stats.appendChild(sd);
+  });
+  sbCard.appendChild(stats);
+}
+sbTabs.querySelectorAll('.sb-tab').forEach((el,i) => el.addEventListener('click', () => renderSB(i)));
+renderSB(0);
+
+// ---------- WIDGET 2: LATENCY SIMULATOR ----------
+// Anchored to real measurements taken 2026-05-17 at 5,208 docs / 89,855 chunks:
+//   vector top-70 = 6.1 ms p50, BM25 top-70 = 7.2 ms p50, Kuzu 2-hop = 1.0 ms p50.
+// Scaling: IvfPq has a log(N) factor over total cells visited; tantivy FTS has
+// roughly sqrt(N) for top-k; graph 2-hop is bounded by node-fanout, near-constant.
+// Real avg is 89,855 / 5,208 = 17.3 chunks per document.
+const CHUNKS_PER_DOC = 17.3;
+const ANCHOR_CHUNKS = 89855;
+function estLat(nDocs){
+  const chunks = Math.max(1000, Math.round(nDocs * CHUNKS_PER_DOC));
+  const r = chunks / ANCHOR_CHUNKS;
+  return {
+    vector: Math.max(2, Math.round(6.1 * (1 + 0.25 * Math.log2(Math.max(r, 0.5))))),
+    bm25:   Math.max(3, Math.round(7.2 * Math.sqrt(r))),
+    graph:  Math.max(1, Math.round(1.0 * Math.pow(r, 0.25))),
+    rerank: Math.round(45 + 0.00005 * chunks)
+  };
+}
+const latSlider = document.getElementById('latSlider');
+const latVal = document.getElementById('latVal');
+const latBars = document.getElementById('latBars');
+const latNote = document.getElementById('latNote');
+function renderLAT(){
+  const n = parseInt(latSlider.value, 10);
+  latVal.textContent = n.toLocaleString();
+  const l = estLat(n);
+  const ops = [
+    { name:'Vector search', val:l.vector, target:5 },
+    { name:'BM25 search', val:l.bm25, target:50 },
+    { name:'Graph 2-hop', val:l.graph, target:30 },
+    { name:'Rerank top-70', val:l.rerank, target:80 }
+  ];
+  const max = Math.max(...ops.map(o => Math.max(o.val, o.target)));
+  latBars.textContent = '';
+  ops.forEach(o => {
+    const row = document.createElement('div'); row.className = 'lat-bar-row';
+    const nm = document.createElement('div'); nm.className = 'lat-bar-name'; nm.textContent = o.name;
+    const track = document.createElement('div'); track.className = 'lat-bar-track';
+    const fill = document.createElement('div');
+    fill.className = 'lat-bar-fill ' + (o.val <= o.target ? 'ok' : (o.val <= o.target * 2 ? 'warn' : 'bad'));
+    fill.style.width = ((o.val / max) * 100).toFixed(1) + '%';
+    track.appendChild(fill);
+    const val = document.createElement('div'); val.className = 'lat-bar-val'; val.textContent = o.val + ' ms';
+    row.appendChild(nm); row.appendChild(track); row.appendChild(val);
+    latBars.appendChild(row);
+  });
+  document.querySelectorAll('#latPresets .lat-preset').forEach(b => b.classList.toggle('active', parseInt(b.dataset.c,10) === n));
+  let note;
+  if(n <= 6000) note = 'Current scale. Real measurements: vector 6.1 ms, BM25 7.2 ms, graph 1.0 ms. Every operation is well inside p95 budgets. No optimization needed.';
+  else if(n <= 25000) note = 'Healthy. BM25 latency catches up to vector around 20k docs. Hybrid fusion still answers in roughly 15-25 ms; the LLM rerank still dominates total time.';
+  else if(n <= 60000) note = 'Watch BM25. Past 50k docs the tantivy FTS scan starts dominating storage time. Consider per-agency partitions or a small Bloom prefilter on the FTS query.';
+  else note = 'Re-evaluate. Past 100k docs: vector IvfPq probes need re-tuning, BM25 sharding becomes worthwhile, and Kuzu node-type partitioning starts mattering for the largest agencies (RCW + WAC dominate today).';
+  latNote.textContent = note;
+}
+latSlider.addEventListener('input', renderLAT);
+document.querySelectorAll('#latPresets .lat-preset').forEach(b => b.addEventListener('click', () => { latSlider.value = b.dataset.c; renderLAT(); }));
+renderLAT();
+
+// TOC + fade-in
+const tocLinks = document.querySelectorAll('#toc a');
+const sections = document.querySelectorAll('section.chapter');
+const io = new IntersectionObserver((entries) => { entries.forEach(e => { if(e.isIntersecting){ const id=e.target.id; tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href')==='#'+id)); }}); }, { rootMargin: '-40% 0px -55% 0px', threshold:0 });
+sections.forEach(s => io.observe(s));
+tocLinks.forEach(a => a.addEventListener('click', (e) => { const h=a.getAttribute('href'); if(h && h.startsWith('#')){ e.preventDefault(); const t=document.querySelector(h); if(t) t.scrollIntoView({behavior:'smooth',block:'start'}); }}));
+const fadeIo = new IntersectionObserver((entries) => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); }), { threshold:0.08 });
+document.querySelectorAll('section.chapter, .surface').forEach(el => { el.classList.add('fade'); fadeIo.observe(el); });
+</script>
+</body>
+</html>

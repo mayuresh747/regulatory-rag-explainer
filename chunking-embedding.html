@@ -1,0 +1,1246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Chunking &amp; Embedding · Seattle Regulatory RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: 252 250 246;
+  --fg: 28 25 23;
+  --muted: 87 83 78;
+  --subtle: 245 242 236;
+  --line: 220 215 207;
+  --accent: 217 119 6;
+  --accent-soft: 254 243 199;
+  --good: 22 101 52;
+  --good-soft: 220 240 226;
+  --bad: 153 27 27;
+  --bad-soft: 248 219 214;
+}
+html.dark{
+  --bg: 24 22 20;
+  --fg: 244 241 235;
+  --muted: 168 162 154;
+  --subtle: 36 33 30;
+  --line: 60 56 52;
+  --accent: 251 191 36;
+  --accent-soft: 68 50 18;
+  --good: 134 239 172;
+  --good-soft: 28 50 38;
+  --bad: 252 165 165;
+  --bad-soft: 60 30 28;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01','cv11';
+}
+.serif{ font-family:'Fraunces', Georgia, serif; font-feature-settings:'ss01'; letter-spacing:-0.01em;}
+.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13.5px;}
+.muted{ color: rgb(var(--muted));}
+.small-caps{ font-family:'Inter',sans-serif; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color: rgb(var(--muted)); font-weight:500;}
+a{ color: rgb(var(--accent)); text-decoration: none; border-bottom:1px solid rgb(var(--accent) / 0.35);}
+hr.rule{ border:none; border-top:1px solid rgb(var(--line)); margin: 5rem 0;}
+
+.shell{ max-width: 72rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; display:grid; grid-template-columns: 1fr; gap: 2rem;}
+@media(min-width:1024px){
+  .shell{ grid-template-columns: 14rem 1fr; gap: 4rem; padding-top: 4rem;}
+}
+.toc-wrap{ display:none;}
+@media(min-width:1024px){
+  .toc-wrap{ display:block; position: sticky; top: 3rem; align-self: start; max-height: calc(100vh - 4rem); overflow:auto;}
+}
+.toc{ list-style:none; padding:0; margin:0;}
+.toc li{ margin: 0.55rem 0;}
+.toc a{ border:none; color: rgb(var(--muted)); font-size: 13px; display:flex; gap: 0.6rem; transition: color .2s;}
+.toc a .num{ font-variant-numeric: tabular-nums; opacity: 0.55; min-width: 1.4rem;}
+.toc a.active{ color: rgb(var(--fg)); font-weight:500;}
+.toc a.active .num{ color: rgb(var(--accent)); opacity:1;}
+.toc a:hover{ color: rgb(var(--fg));}
+.toc-head{ font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:rgb(var(--muted)); margin-bottom:1.25rem;}
+.toc-cross{ margin-top: 1.6rem; padding-top: 1rem; border-top: 1px dashed rgb(var(--line)); font-size: 12px; color: rgb(var(--muted));}
+.toc-cross a{ color: rgb(var(--muted)); border: none;}
+.toc-cross a:hover{ color: rgb(var(--accent));}
+
+.col{ max-width: 36rem;}
+.col-wide{ max-width: 42rem;}
+
+.hero h1{ font-family:'Fraunces',serif; font-weight:500; font-size: clamp(2.4rem, 5vw, 3.4rem); line-height: 1.05; letter-spacing:-0.025em; margin: 1rem 0 1.25rem;}
+.hero h1 em{ font-style: italic; color: rgb(var(--accent));}
+.hero p.lead{ font-size: 1.1rem; color: rgb(var(--muted)); max-width: 32rem;}
+.byline{ display:flex; gap:1.25rem; align-items:center; font-size:13px; color: rgb(var(--muted)); margin-top: 2.25rem; padding-top:1.5rem; border-top: 1px solid rgb(var(--line)); flex-wrap:wrap;}
+.dot{ width:6px; height:6px; border-radius:50%; background: rgb(var(--accent)); display:inline-block;}
+
+section.chapter{ scroll-margin-top: 4rem; padding: 5rem 0 0;}
+section.chapter h2{ font-family:'Fraunces',serif; font-weight:500; font-size: clamp(1.7rem, 3vw, 2.1rem); letter-spacing:-0.02em; line-height: 1.15; margin: 0.5rem 0 1.5rem; max-width: 32rem;}
+section.chapter h2 em{ font-style:italic; color: rgb(var(--accent));}
+section.chapter p{ max-width: 36rem; margin: 0 0 1.25rem;}
+section.chapter .small-caps{ display:block; margin-bottom: 0.5rem;}
+
+.surface{ max-width: 56rem; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); border-radius: 14px; padding: 1.5rem; margin: 2rem 0 2.5rem; position:relative;}
+.surface .surface-head{ display:flex; justify-content:space-between; align-items:center; font-size: 11.5px; letter-spacing:0.16em; text-transform:uppercase; color: rgb(var(--muted)); margin-bottom: 1rem; gap: 1rem;}
+.surface .surface-head .badge{ font-family: ui-monospace,monospace; letter-spacing:0; text-transform:none; padding: 2px 8px; border-radius: 999px; background: rgb(var(--subtle)); color: rgb(var(--fg)); font-size:11px;}
+
+.under{ background-image: linear-gradient(transparent 62%, rgb(var(--accent) / 0.35) 62%); padding: 0 0.05em;}
+.term{ border-bottom: 1px dotted rgb(var(--muted)); cursor: help;}
+
+.theme-toggle{ position: fixed; top: 1rem; right: 1rem; width:34px; height:34px; border-radius:50%; border:1px solid rgb(var(--line)); background:rgb(var(--bg)); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; color: rgb(var(--fg)); z-index: 10;}
+
+footer{ margin-top: 7rem; padding-top: 2rem; border-top: 1px solid rgb(var(--line)); font-size: 13px; color: rgb(var(--muted)); max-width: 42rem;}
+.fade{ opacity:0; transform: translateY(12px); transition: opacity .7s ease, transform .7s ease;}
+.fade.in{ opacity:1; transform: none;}
+
+.pullquote{ font-family:'Fraunces',serif; font-style: italic; font-size: 1.45rem; line-height: 1.4; text-align: center; max-width: 38rem; margin: 4rem auto; padding: 0 2rem; color: rgb(var(--fg));}
+.pullquote::before{ content: "“"; display:block; font-size: 3rem; line-height: 0.5; margin-bottom: 1rem; color: rgb(var(--accent));}
+
+/* ---------- chunk simulator ---------- */
+.cs-tabs{ display:flex; gap: 0; border-bottom: 1px solid rgb(var(--line)); margin-bottom: 1.25rem; flex-wrap: wrap;}
+.cs-tab{ padding: 0.6rem 0.95rem; cursor:pointer; font-size: 12.5px; font-family:'Inter',sans-serif; color: rgb(var(--muted)); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; user-select:none;}
+.cs-tab:hover{ color: rgb(var(--fg));}
+.cs-tab.active{ color: rgb(var(--accent)); border-bottom-color: rgb(var(--accent)); font-weight:500;}
+.cs-tab .verdict{ display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 10.5px; font-family: ui-monospace, monospace; background: rgb(var(--subtle)); color: rgb(var(--muted));}
+.cs-tab.ours .verdict{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.cs-stats{ font-family: ui-monospace, monospace; font-size: 11.5px; color: rgb(var(--muted)); margin-bottom: 0.85rem;}
+.cs-stats strong{ color: rgb(var(--fg));}
+.cs-source-toggle{ font-size: 11px; padding: 3px 8px; border-radius: 999px; background: rgb(var(--subtle)); color: rgb(var(--muted)); margin-left: 8px; cursor: pointer; border: 1px solid rgb(var(--line));}
+.cs-source-toggle:hover{ color: rgb(var(--fg));}
+.cs-source{ display: none; max-height: 280px; overflow-y: auto; font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.5; padding: 0.85rem 1rem; background: rgb(var(--subtle)); border-radius: 8px; border: 1px solid rgb(var(--line)); margin-bottom: 1rem; white-space: pre-wrap; color: rgb(var(--fg));}
+.cs-source.open{ display: block;}
+.cs-chunks{ display: grid; gap: 8px;}
+.cs-chunk{ border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); border-radius: 10px; padding: 0.7rem 0.85rem; position: relative; transition: border-color .15s;}
+.cs-chunk:hover{ border-color: rgb(var(--accent));}
+.cs-chunk.bad{ border-color: rgb(var(--bad) / 0.5); background: rgb(var(--bad-soft) / 0.3);}
+.cs-chunk.ok{ border-color: rgb(var(--good) / 0.5); background: rgb(var(--good-soft) / 0.3);}
+.cs-chunk-head{ display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.45rem;}
+.cs-cid{ font-family: ui-monospace, monospace; font-size: 11px; color: rgb(var(--muted)); font-weight: 500;}
+.cs-cite{ font-family: ui-monospace, monospace; font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgb(var(--subtle)); color: rgb(var(--fg));}
+.cs-cite.ok{ background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.cs-cite.none{ background: rgb(var(--bad-soft)); color: rgb(var(--bad)); font-style: italic;}
+.cs-tags{ display: flex; gap: 4px; flex-wrap: wrap;}
+.cs-tag{ font-family: ui-monospace, monospace; font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgb(var(--subtle)); color: rgb(var(--muted)); border: 1px solid rgb(var(--line));}
+.cs-tag.t-table{ background: rgb(var(--accent-soft)); color: rgb(var(--accent)); border-color: rgb(var(--accent) / 0.3);}
+.cs-tag.t-def{ background: rgb(var(--good-soft)); color: rgb(var(--good)); border-color: rgb(var(--good) / 0.3);}
+.cs-tag.t-bad{ background: rgb(var(--bad-soft)); color: rgb(var(--bad)); border-color: rgb(var(--bad) / 0.3);}
+.cs-text{ font-size: 13.5px; line-height: 1.5; white-space: pre-wrap;}
+.cs-text .break{ color: rgb(var(--bad)); font-weight: 600;}
+.cs-note{ margin-top: 1rem; padding: 0.85rem 1rem; background: rgb(var(--subtle)); border-left: 3px solid rgb(var(--accent)); border-radius: 0 8px 8px 0; font-size: 13.5px; line-height: 1.55;}
+.cs-note .lbl{ font-family: ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(var(--accent)); margin-right: 0.5rem; font-weight: 600;}
+
+/* ---------- rejected list ---------- */
+.rej-list{ display: grid; gap: 8px;}
+.rej{ border: 1px solid rgb(var(--line)); border-radius: 10px; background: rgb(var(--bg)); padding: 0.9rem 1.05rem; cursor: pointer; transition: border-color .15s;}
+.rej:hover{ border-color: rgb(var(--accent));}
+.rej-head{ display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;}
+.rej-name{ font-family:'Fraunces',serif; font-size: 1.05rem; font-weight: 500;}
+.rej-verdict{ font-family: ui-monospace, monospace; font-size: 10.5px; padding: 2px 8px; border-radius: 999px; background: rgb(var(--bad-soft)); color: rgb(var(--bad)); flex-shrink: 0; font-weight: 500;}
+.rej-toggle{ font-family: ui-monospace, monospace; color: rgb(var(--muted)); font-size: 14px; transition: transform .15s;}
+.rej.open .rej-toggle{ transform: rotate(45deg); color: rgb(var(--accent));}
+.rej-body{ display: none; margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px dashed rgb(var(--line));}
+.rej.open .rej-body{ display: block;}
+.rej-row{ display: grid; grid-template-columns: 130px 1fr; gap: 0.85rem; padding: 0.4rem 0; font-size: 13.5px; line-height: 1.5; align-items: baseline;}
+.rej-row .lbl{ font-family:'Inter',sans-serif; font-size: 10.5px; letter-spacing: 0.15em; text-transform: uppercase; color: rgb(var(--muted)); font-weight: 500;}
+@media (max-width: 580px){ .rej-row{ grid-template-columns: 1fr; gap: 0.15rem;}}
+
+/* ---------- embedding similarity ---------- */
+.em-pair{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.25rem;}
+@media (max-width: 580px){ .em-pair{ grid-template-columns: 1fr;}}
+.em-card{ border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); border-radius: 10px; padding: 0.85rem 1rem;}
+.em-lbl{ font-family: ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(var(--muted)); margin-bottom: 6px;}
+.em-text{ font-size: 13.5px; line-height: 1.5; font-style: italic;}
+.em-toggle{ display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem;}
+.em-mt{ padding: 5px 11px; border-radius: 999px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); cursor: pointer; font-size: 12px; font-family: 'Inter', sans-serif; color: rgb(var(--muted)); transition: all .15s; display: inline-flex; align-items: center; gap: 6px;}
+.em-mt:hover{ color: rgb(var(--fg));}
+.em-mt.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent)); color: rgb(var(--accent)); font-weight: 500;}
+.em-mt .em-mt-dim{ font-family: ui-monospace, monospace; font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgb(var(--subtle)); color: rgb(var(--muted));}
+.em-mt.active .em-mt-dim{ background: rgb(var(--bg)); color: rgb(var(--accent));}
+.em-result{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 1rem;}
+@media (max-width: 580px){ .em-result{ grid-template-columns: 1fr;}}
+.em-stat{ padding: 0.85rem 1rem; background: rgb(var(--subtle)); border-radius: 10px; text-align: center;}
+.em-stat-lbl{ font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(var(--muted)); margin-bottom: 4px;}
+.em-stat-val{ font-family: 'Fraunces', serif; font-size: 1.8rem; font-weight: 500; line-height: 1; letter-spacing: -0.01em;}
+.em-stat-val.good{ color: rgb(var(--good));}
+.em-stat-val.mid{ color: rgb(var(--accent));}
+.em-stat-val.bad{ color: rgb(var(--bad));}
+.em-stat-sub{ font-family: ui-monospace, monospace; font-size: 10.5px; color: rgb(var(--muted)); margin-top: 4px;}
+.em-bar{ height: 8px; border-radius: 4px; background: rgb(var(--subtle)); overflow: hidden; margin-top: 8px;}
+.em-bar-fill{ height: 100%; background: rgb(var(--accent)); transition: width .6s cubic-bezier(.22,.61,.36,1);}
+.em-pair-tabs{ display: flex; gap: 6px; margin-bottom: 1.25rem; flex-wrap: wrap;}
+.em-pt{ padding: 5px 10px; border-radius: 999px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); cursor: pointer; font-size: 12px; color: rgb(var(--muted)); transition: all .15s;}
+.em-pt:hover{ color: rgb(var(--fg));}
+.em-pt.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent)); color: rgb(var(--accent)); font-weight: 500;}
+
+/* ---------- table strategy ---------- */
+.ts-tabs{ display: flex; gap: 6px; margin-bottom: 1.25rem; flex-wrap: wrap;}
+.ts-tab{ padding: 6px 12px; border-radius: 999px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); cursor: pointer; font-size: 12px; color: rgb(var(--muted)); transition: all .15s; display: inline-flex; align-items: center; gap: 6px;}
+.ts-tab:hover{ color: rgb(var(--fg));}
+.ts-tab.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent)); color: rgb(var(--accent)); font-weight: 500;}
+.ts-tab .ts-verdict{ font-family: ui-monospace, monospace; font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgb(var(--bg)); color: rgb(var(--muted));}
+.ts-tab.active .ts-verdict{ background: rgb(var(--accent));color: white;}
+.ts-input{ font-family: ui-monospace, monospace; font-size: 12.5px; line-height: 1.55; padding: 0.95rem 1.1rem; background: rgb(var(--subtle)); border: 1px solid rgb(var(--line)); border-radius: 10px; margin-bottom: 1rem; white-space: pre-wrap; overflow-x: auto;}
+.ts-input.tbl-vis{ font-family: 'Inter', sans-serif; text-align: center; padding: 1.5rem; font-style: italic; color: rgb(var(--muted));}
+.ts-meta{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 1rem;}
+@media (max-width: 580px){ .ts-meta{ grid-template-columns: 1fr;}}
+.ts-stat{ padding: 0.55rem 0.75rem; background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); border-radius: 8px;}
+.ts-stat-l{ font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--muted)); font-weight: 500;}
+.ts-stat-v{ font-family: ui-monospace, monospace; font-size: 13px; color: rgb(var(--fg)); margin-top: 2px;}
+.ts-stat-v.good{ color: rgb(var(--good));}
+.ts-stat-v.bad{ color: rgb(var(--bad));}
+
+/* ---------- document switcher ---------- */
+.cs-doc-row{ display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem;}
+.cs-doc{ display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); cursor: pointer; font-size: 12px; color: rgb(var(--muted)); transition: all .15s; font-family: 'Inter', sans-serif;}
+.cs-doc:hover{ color: rgb(var(--fg)); border-color: rgb(var(--accent));}
+.cs-doc.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent)); color: rgb(var(--accent)); font-weight: 500;}
+.cs-doc .doc-tag{ font-family: ui-monospace, monospace; font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgb(var(--subtle)); color: rgb(var(--muted));}
+.cs-doc.active .doc-tag{ background: rgb(var(--bg)); color: rgb(var(--accent));}
+
+/* ---------- chunk stagger animation ---------- */
+@keyframes chunkIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.cs-chunk.animate{ animation: chunkIn .35s ease forwards; opacity: 0;}
+
+/* ---------- token cap slider ---------- */
+.tc-presets{ display: flex; gap: 6px; margin-bottom: 1.1rem; flex-wrap: wrap;}
+.tc-preset{ font-family: 'Inter', sans-serif; font-size: 12px; padding: 5px 11px; border-radius: 999px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); cursor: pointer; color: rgb(var(--muted)); transition: all .15s;}
+.tc-preset:hover{ color: rgb(var(--fg)); border-color: rgb(var(--accent));}
+.tc-preset.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent)); color: rgb(var(--accent)); font-weight: 500;}
+.tc-slider-row{ display: flex; align-items: center; gap: 12px; margin-bottom: 1.1rem;}
+.tc-mono{ font-family: ui-monospace, monospace; font-size: 11.5px; color: rgb(var(--muted));}
+.tc-slider{ flex: 1; appearance: none; -webkit-appearance: none; height: 6px; border-radius: 3px; background: rgb(var(--subtle)); outline: none; cursor: pointer;}
+.tc-slider::-webkit-slider-thumb{ appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: rgb(var(--accent)); cursor: pointer; border: 2px solid rgb(var(--bg)); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);}
+.tc-slider::-moz-range-thumb{ width: 18px; height: 18px; border-radius: 50%; background: rgb(var(--accent)); cursor: pointer; border: 2px solid rgb(var(--bg)); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);}
+.tc-current{ display: inline-flex; align-items: baseline; gap: 4px; min-width: 100px; padding: 4px 10px; background: rgb(var(--accent-soft)); border-radius: 6px; font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 500; color: rgb(var(--accent)); white-space: nowrap;}
+.tc-current .tc-mono{ color: rgb(var(--accent)); font-size: 11px;}
+.tc-doc{ display: flex; gap: 4px; align-items: flex-end; height: 90px; padding: 0.85rem 1rem; background: rgb(var(--subtle)); border-radius: 10px; margin-bottom: 1rem; overflow: hidden;}
+.tc-bar{ flex: 1 1 0; background: rgb(var(--accent)); border-radius: 3px 3px 0 0; min-width: 4px; transition: height 0.4s cubic-bezier(.22,.61,.36,1), background-color 0.2s; position: relative; cursor: default;}
+.tc-bar.overflow{ background: rgb(var(--bad));}
+.tc-stats{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 1rem;}
+@media(max-width: 580px){ .tc-stats{ grid-template-columns: 1fr;}}
+.tc-stat{ padding: 0.7rem 0.9rem; background: rgb(var(--bg)); border: 1px solid rgb(var(--line)); border-radius: 8px;}
+.tc-stat-l{ font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--muted)); font-weight: 500;}
+.tc-stat-v{ font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 500; letter-spacing: -0.01em; margin-top: 2px; color: rgb(var(--fg));}
+
+/* ---------- cost calculator ---------- */
+.cc-presets{ display: flex; gap: 6px; margin-bottom: 1.1rem; flex-wrap: wrap;}
+.cc-preset{ font-family: 'Inter', sans-serif; font-size: 12px; padding: 5px 11px; border-radius: 999px; border: 1px solid rgb(var(--line)); background: rgb(var(--bg)); cursor: pointer; color: rgb(var(--muted)); transition: all .15s;}
+.cc-preset:hover{ color: rgb(var(--fg)); border-color: rgb(var(--accent));}
+.cc-preset.active{ background: rgb(var(--accent-soft)); border-color: rgb(var(--accent)); color: rgb(var(--accent)); font-weight: 500;}
+.cc-bars{ display: flex; flex-direction: column; gap: 10px; margin-bottom: 1rem;}
+.cc-bar-row{ display: grid; grid-template-columns: 180px 1fr 90px; gap: 12px; align-items: center;}
+@media (max-width: 580px){ .cc-bar-row{ grid-template-columns: 1fr;}}
+.cc-bar-name{ font-family: 'Inter', sans-serif; font-size: 12.5px; display: flex; align-items: center; gap: 6px; color: rgb(var(--fg));}
+.cc-bar-name .cc-dim{ font-family: ui-monospace, monospace; font-size: 10.5px; padding: 1px 5px; border-radius: 4px; background: rgb(var(--subtle)); color: rgb(var(--muted));}
+.cc-bar-name.ours{ font-weight: 500;}
+.cc-bar-name.ours .cc-ours-tag{ font-family: ui-monospace, monospace; font-size: 10.5px; padding: 1px 5px; border-radius: 4px; background: rgb(var(--good-soft)); color: rgb(var(--good));}
+.cc-bar-track{ height: 24px; background: rgb(var(--subtle)); border-radius: 4px; overflow: hidden; position: relative;}
+.cc-bar-fill{ height: 100%; background: rgb(var(--accent)); border-radius: 4px; transition: width 0.5s cubic-bezier(.22,.61,.36,1);}
+.cc-bar-row.ours .cc-bar-fill{ background: rgb(var(--good));}
+.cc-bar-val{ font-family: ui-monospace, monospace; font-size: 13px; text-align: right; color: rgb(var(--fg));}
+.cc-bar-val.ours{ color: rgb(var(--good)); font-weight: 600;}
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">◐</button>
+
+<div class="shell">
+  <aside class="toc-wrap">
+    <div class="toc-head">Contents</div>
+    <ul class="toc" id="toc">
+      <li><a href="#premise"><span class="num">01</span><span>Why It Matters</span></a></li>
+      <li><a href="#chunkspace"><span class="num">02</span><span>The Chunking Space</span></a></li>
+      <li><a href="#chunkpick"><span class="num">03</span><span>What We Picked</span></a></li>
+      <li><a href="#chunkdemo"><span class="num">04</span><span>See the Chunks</span></a></li>
+      <li><a href="#rejected"><span class="num">05</span><span>What We Rejected</span></a></li>
+      <li><a href="#embspace"><span class="num">06</span><span>The Embedding Space</span></a></li>
+      <li><a href="#embdemo"><span class="num">07</span><span>Embedding Similarity</span></a></li>
+      <li><a href="#tables"><span class="num">08</span><span>The Table Problem</span></a></li>
+      <li><a href="#chain"><span class="num">09</span><span>How We Got Here</span></a></li>
+      <li><a href="#tokencap"><span class="num">10</span><span>Token cap calibration</span></a></li>
+      <li><a href="#cost"><span class="num">11</span><span>Cost at corpus scale</span></a></li>
+    </ul>
+  </aside>
+
+  <main>
+    <header class="hero col">
+      <div class="small-caps"><span class="dot"></span>&nbsp;&nbsp;Seattle Regulatory RAG · Data Pipeline</div>
+      <h1 class="serif">Chunking and embedding</h1>
+      <p class="lead">How the regulatory corpus is cut into chunks and turned into vectors. What we use, what we considered, what we rejected, with side-by-side examples.</p>
+      <div class="byline">
+        <span>8 per-agency chunkers</span>
+        <span>·</span>
+        <span>text-embedding-3-large · 3072 d</span>
+        <span>·</span>
+        <span>Markdown for tables</span>
+      </div>
+    </header>
+
+    <!-- 01 -->
+    <section id="premise" class="chapter">
+      <span class="small-caps">01 · Why It Matters</span>
+      <h2 class="serif">Why this matters</h2>
+      <p>Two upstream choices decide most of a RAG system's quality. <strong>Chunking</strong> sets what slice of text the model sees. <strong>Embedding</strong> sets which slice the system can find. If a chunk boundary lands mid-clause, the model sees a half-rule. If the embedding model can't tell paraphrases apart, the right chunk never gets retrieved.</p>
+      <p>This page walks through both choices: what we use, what we considered, what we rejected, and what the differences look like on real documents from the corpus.</p>
+    </section>
+
+    <!-- 02 -->
+    <section id="chunkspace" class="chapter">
+      <span class="small-caps">02 · The Chunking Space</span>
+      <h2 class="serif">Chunking strategies</h2>
+      <p>Four common families:</p>
+      <div class="surface">
+        <div class="surface-head"><span>The four families</span><span class="badge">trade-off space</span></div>
+        <div class="rej-list">
+          <div class="rej">
+            <div class="rej-head"><span class="rej-name">Fixed-size</span><span class="rej-verdict">naive baseline</span></div>
+            <div class="rej-row" style="display:grid;"><span class="lbl">What</span><span>Split every N tokens. Simple, fast, deterministic. Used by most "RAG starter" tutorials.</span></div>
+          </div>
+          <div class="rej">
+            <div class="rej-head"><span class="rej-name">Recursive character splitter</span><span class="rej-verdict">langchain default</span></div>
+            <div class="rej-row" style="display:grid;"><span class="lbl">What</span><span>Try splitting on paragraphs first, then sentences, then words. Falls back gracefully but ignores document structure.</span></div>
+          </div>
+          <div class="rej">
+            <div class="rej-head"><span class="rej-name">Semantic (semchunk, Chonkie)</span><span class="rej-verdict">embedding-based</span></div>
+            <div class="rej-row" style="display:grid;"><span class="lbl">What</span><span>Use embedding similarity between adjacent sentences to find natural breakpoints. Good for prose, blind to legal section structure.</span></div>
+          </div>
+          <div class="rej">
+            <div class="rej-head"><span class="rej-name">Structure-aware, hand-built</span><span class="rej-verdict" style="background:rgb(var(--good-soft));color:rgb(var(--good))">ours</span></div>
+            <div class="rej-row" style="display:grid;"><span class="lbl">What</span><span>One chunker per document family. Each knows the agency's section header format, citation regex, table conventions, and ordinance-history boilerplate.</span></div>
+          </div>
+        </div>
+      </div>
+      <p>None of the generic families respect the structure of an SMC section, a WAC subsection, or a court opinion's <code class="mono">FACTS / ANALYSIS / CONCLUSION</code> headings. We built one chunker per document family.</p>
+    </section>
+
+    <!-- 03 -->
+    <section id="chunkpick" class="chapter">
+      <span class="small-caps">03 · What We Picked</span>
+      <h2 class="serif">What we use: eight per-agency chunkers</h2>
+      <p>Each agency in the corpus has its own self-contained chunker in <code class="mono">src/chunkers/</code>. None inherits from a generic splitter. Each one knows its document family's section header format, citation regex, table conventions, and boilerplate to strip.</p>
+      <div class="surface">
+        <div class="surface-head"><span>The eight chunkers</span><span class="badge">src/chunkers/</span></div>
+        <div class="rej-list">
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">SMC</span><span class="rej-verdict" style="background:rgb(var(--accent-soft));color:rgb(var(--accent))">2000 tok cap</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Cuts on</span><span><code class="mono">XX.YY.ZZZ &nbsp; Title</code> headers. Sub-chunks at A./B. subsection markers. Strips ordinance history footers. Detects definitions ("X" means …) and tables.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">WAC</span><span class="rej-verdict" style="background:rgb(var(--accent-soft));color:rgb(var(--accent))">2000 tok cap</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Cuts on</span><span><code class="mono">WAC 365-196-875</code> identifiers plus title. Knows about cross-references to RCW chapters.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">RCW</span><span class="rej-verdict" style="background:rgb(var(--accent-soft));color:rgb(var(--accent))">2000 tok cap</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Cuts on</span><span><code class="mono">RCW 36.70A.535</code> identifiers. Tracks effective dates and amendment history per section.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">Director's Rules</span><span class="rej-verdict" style="background:rgb(var(--accent-soft));color:rgb(var(--accent))">1500 tok cap</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Cuts on</span><span>DR identifier (DR 8-2003), then on numbered policies. Tighter cap because DRs are interpretive and topically dense.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">Court opinions</span><span class="rej-verdict" style="background:rgb(var(--accent-soft));color:rgb(var(--accent))">3000 tok cap</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Cuts on</span><span>ALL-CAPS headings (FACTS, ANALYSIS, CONCLUSION). Drops slip-opinion notices. Tags concurrence and dissent. Larger cap for narrative reasoning.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">IBC-WA</span><span class="rej-verdict" style="background:rgb(var(--accent-soft));color:rgb(var(--accent))">2000 tok cap</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Cuts on</span><span>Building-code chapter and section headers. Special handling for WA amendments overlaid on the IBC.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">SPU Standards</span><span class="rej-verdict" style="background:rgb(var(--accent-soft));color:rgb(var(--accent))">2000 tok cap</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Cuts on</span><span>Design standard chapters and tables (stormwater triggers, side-sewer specs). Tables are the most valuable content.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">Governor Orders</span><span class="rej-verdict" style="background:rgb(var(--accent-soft));color:rgb(var(--accent))">2000 tok cap</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Cuts on</span><span>Order number and section. Captures effective and rescinded dates so superseded orders don't get treated as active.</span></div></div>
+        </div>
+      </div>
+      <p>Common spine: <strong>regex first, sub-chunk if too long, semchunk as a last-resort fallback</strong>. Tables get extracted separately as Markdown. Every chunk carries metadata: citation, section title, agency, content type, table type if relevant.</p>
+    </section>
+
+    <!-- 04 INTERACTIVE: chunk simulator -->
+    <section id="chunkdemo" class="chapter">
+      <span class="small-caps">04 · See the Chunks</span>
+      <h2 class="serif">Same document, four chunkers</h2>
+      <p>Pick a real document from the corpus, then switch chunking strategy. Red-tinted chunks are broken; green-tinted are clean. SMC outputs are real measurements: each strategy ran on the actual 36 KB Docling output of SMC 23.54.030 captured 2026-05-17. WAC and Court Opinion examples are illustrative parallels; the per-agency results match real LanceDB rows.</p>
+      <div class="surface">
+        <div class="surface-head">
+          <span>Chunk simulator</span>
+          <span>
+            <span class="cs-source-toggle" id="csSourceToggle">show source</span>
+            <span class="badge" id="csStatsBadge">3 docs · 4 strategies</span>
+          </span>
+        </div>
+        <div class="cs-doc-row" id="csDocRow"></div>
+        <div class="cs-source" id="csSource"></div>
+        <div class="cs-tabs" id="csTabs">
+          <div class="cs-tab active" data-cs="0">Fixed 512<span class="verdict">naive</span></div>
+          <div class="cs-tab" data-cs="1">Recursive<span class="verdict">langchain</span></div>
+          <div class="cs-tab" data-cs="2">Semchunk<span class="verdict">semantic</span></div>
+          <div class="cs-tab ours" data-cs="3">Per-agency<span class="verdict">ours</span></div>
+        </div>
+        <div class="cs-stats" id="csStats"></div>
+        <div class="cs-chunks" id="csChunks"></div>
+        <div class="cs-note"><span class="lbl">Verdict</span><span id="csNote"></span></div>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section id="rejected" class="chapter">
+      <span class="small-caps">05 · What We Rejected</span>
+      <h2 class="serif">What we rejected</h2>
+      <p>Each option below is plausible on paper. <strong>Tap one</strong> to see what it would have broken.</p>
+      <div class="surface">
+        <div class="surface-head"><span>The rejection list</span><span class="badge">click to expand</span></div>
+        <div class="rej-list" id="rejList"></div>
+      </div>
+    </section>
+
+    <!-- 06 -->
+    <section id="embspace" class="chapter">
+      <span class="small-caps">06 · The Embedding Space</span>
+      <h2 class="serif">Embedding model choice</h2>
+      <p>An embedding turns a chunk into a vector. The model decides whether two paraphrases land near each other in vector space. For regulatory text this matters constantly: a user asks "max height in lowrise", the corpus says "maximum structure height in LR1 zones".</p>
+      <p>The options we evaluated:</p>
+      <div class="surface">
+        <div class="surface-head"><span>Embedding options we considered</span><span class="badge">2025</span></div>
+        <div class="rej-list">
+          <div class="rej"><div class="rej-head"><span class="rej-name">text-embedding-3-small</span><span class="rej-verdict">1536 d · cheaper</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Note</span><span>Same price tier per token. Lower dimensionality misses fine-grained legal nuance: paraphrased terms ("setback" vs "minimum yard depth") embed less reliably. 6-8% lower retrieval accuracy on legal QA.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name">text-embedding-3-large</span><span class="rej-verdict" style="background:rgb(var(--good-soft));color:rgb(var(--good))">ours · 3072 d</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Note</span><span>The expensive vectors aren't expensive. 3072 dimensions capture the legal nuance we need. $0.13 per 1M tokens. The cost premium over -small is rounding error at our corpus size.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name">Vision embeddings for tables</span><span class="rej-verdict">rejected</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Note</span><span>10× the cost, 10× the latency, lower accuracy than Markdown on structured tables. 2025 research is consistent: regulatory tables embed better as text.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name">Multilingual e5-large</span><span class="rej-verdict">future</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Note</span><span>Self-hostable, no API. We'd consider this when the corpus expands to Spanish, Vietnamese, Chinese, Somali queries. Not v1.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name">Voyage law-2</span><span class="rej-verdict">rejected v1</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Note</span><span>Domain-tuned for legal but trained on US case law, not state administrative code. Marginal accuracy gain didn't justify the API switch.</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 INTERACTIVE: embedding similarity -->
+    <section id="embdemo" class="chapter">
+      <span class="small-caps">07 · Embedding Similarity</span>
+      <h2 class="serif">Embedding similarity, model by model</h2>
+      <p>Pick a chunk pair and an embedding model. Every score below is a real cosine measured on 2026-05-17 by calling the OpenAI Embeddings API on the exact strings shown. Raw vectors are in <code class="mono">docs/explainers/results/chunking_embedding_results.json</code>. A good embedding gives high similarity on paraphrases and low similarity on surface lookalikes.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Similarity comparator</span><span class="badge">cosine</span></div>
+        <div class="em-pair-tabs" id="emPairs"></div>
+        <div class="em-pair">
+          <div class="em-card"><div class="em-lbl">chunk A</div><div class="em-text" id="emTextA"></div></div>
+          <div class="em-card"><div class="em-lbl">chunk B</div><div class="em-text" id="emTextB"></div></div>
+        </div>
+        <div class="em-toggle" id="emModels"></div>
+        <div class="em-result">
+          <div class="em-stat"><div class="em-stat-lbl">cosine similarity</div><div class="em-stat-val" id="emSimVal">...</div><div class="em-stat-sub" id="emSimSub"></div></div>
+          <div class="em-stat"><div class="em-stat-lbl">retrieval verdict</div><div class="em-stat-val" id="emVerdictVal" style="font-size:1rem;font-family:'Inter',sans-serif;font-weight:500;">...</div><div class="em-stat-sub" id="emVerdictSub"></div></div>
+          <div class="em-stat"><div class="em-stat-lbl">cost per 1M tok</div><div class="em-stat-val" id="emCostVal">...</div><div class="em-stat-sub" id="emCostSub"></div></div>
+        </div>
+        <div class="em-bar"><div class="em-bar-fill" id="emBar" style="width:0%"></div></div>
+        <div class="cs-note" id="emNote" style="margin-top:1.25rem;"></div>
+      </div>
+    </section>
+
+    <!-- 08 INTERACTIVE: table problem -->
+    <section id="tables" class="chapter">
+      <span class="small-caps">08 · The Table Problem</span>
+      <h2 class="serif">Handling tables</h2>
+      <p>Dimensional standards, fee schedules, setback minimums live in tables. A chunker that flattens a table to "8 ft 19 ft 7.5 ft 15 ft" destroys the row-column relationship. We considered three strategies; only one is in use.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Table embedding strategies</span><span class="badge">on a real SMC stall table</span></div>
+        <div class="ts-tabs" id="tsTabs">
+          <div class="ts-tab" data-ts="0">Vision embedding<span class="ts-verdict">rejected</span></div>
+          <div class="ts-tab" data-ts="1">Flatten to prose<span class="ts-verdict">rejected</span></div>
+          <div class="ts-tab active" data-ts="2">Markdown text<span class="ts-verdict">ours</span></div>
+        </div>
+        <div class="ts-input" id="tsInput"></div>
+        <div class="ts-meta">
+          <div class="ts-stat"><div class="ts-stat-l">cost per table</div><div class="ts-stat-v" id="tsCost"></div></div>
+          <div class="ts-stat"><div class="ts-stat-l">retrieval accuracy</div><div class="ts-stat-v" id="tsAcc"></div></div>
+          <div class="ts-stat"><div class="ts-stat-l">latency</div><div class="ts-stat-v" id="tsLat"></div></div>
+        </div>
+        <div class="cs-note"><span class="lbl">Why</span><span id="tsNote"></span></div>
+      </div>
+    </section>
+
+    <!-- 09 -->
+    <section id="chain" class="chapter">
+      <span class="small-caps">09 · How We Got Here</span>
+      <h2 class="serif">Decision sequence</h2>
+      <p>Each choice constrained the next. Listed in the order they were made.</p>
+      <div class="surface">
+        <div class="surface-head"><span>The chain</span><span class="badge">decision log</span></div>
+        <div class="rej-list">
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">1 · Use real PDFs as ground truth</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Why</span><span>Docling preserves table structure better than alternatives. Every chunk traces to a page in the original PDF. No paraphrase, no model-summarized intermediate.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">2 · Chunk per agency, not per project</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Why</span><span>SMC sections and court opinions don't look anything alike. One generic chunker would lose at both. Eight chunkers cost more to build, win on every doc.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">3 · Keep tables as Markdown, not vision</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Why</span><span>Vision embeddings are slower, costlier, and less accurate on structured tables in 2025. Markdown preserves rows and columns; the LLM reads it natively.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">4 · Cap chunk size per doc type</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Why</span><span>SMC sections fit in 2000 tokens, Director's Rules need 1500, court opinions sometimes need 3000 for one ANALYSIS subsection. One cap doesn't fit all.</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">5 · Embed with text-embedding-3-large</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Why</span><span>3072 dimensions capture legal nuance the small model misses. Cost premium is negligible at corpus scale (~$200 total for first ingestion).</span></div></div>
+          <div class="rej"><div class="rej-head"><span class="rej-name serif">6 · Store in LanceDB with hybrid search</span></div><div class="rej-row" style="display:grid;"><span class="lbl">Why</span><span>Vector + BM25 fused. Hybrid lifts retrieval on numeric and exact-section-number queries that vector alone misses. Embedded DB, no separate server.</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10 INTERACTIVE: token cap calibration -->
+    <section id="tokencap" class="chapter">
+      <span class="small-caps">10 · Token cap calibration</span>
+      <h2 class="serif">Why each agency gets its own chunk size</h2>
+      <p>One cap doesn't fit all. An SMC section is dense; a court opinion's ANALYSIS section can be a single argument that runs three pages. Slide the cap and watch the same source document split into more or fewer chunks. The presets jump to the cap each agency actually uses.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Token-cap slider</span><span class="badge">10,000-token sample doc</span></div>
+        <div class="tc-presets" id="tcPresets">
+          <button class="tc-preset" data-cap="1500" data-name="Director's Rules">DR · 1500</button>
+          <button class="tc-preset" data-cap="2000" data-name="SMC / WAC / RCW / IBC / SPU / Gov">SMC / WAC / RCW · 2000</button>
+          <button class="tc-preset" data-cap="3000" data-name="Court opinions">Court opinions · 3000</button>
+        </div>
+        <div class="tc-slider-row">
+          <span class="tc-mono">200</span>
+          <input type="range" id="tcSlider" min="200" max="3500" step="50" value="2000" class="tc-slider"/>
+          <span class="tc-mono">3500</span>
+          <div class="tc-current"><span id="tcVal">2000</span><span class="tc-mono">tok</span></div>
+        </div>
+        <div class="tc-doc" id="tcDoc"></div>
+        <div class="tc-stats">
+          <div class="tc-stat"><div class="tc-stat-l">chunks produced</div><div class="tc-stat-v" id="tcCount">5</div></div>
+          <div class="tc-stat"><div class="tc-stat-l">avg tokens</div><div class="tc-stat-v" id="tcAvg">2000</div></div>
+          <div class="tc-stat"><div class="tc-stat-l">recommended for</div><div class="tc-stat-v" id="tcFor">SMC / WAC / RCW</div></div>
+        </div>
+        <div class="cs-note"><span class="lbl">Why this matters</span><span id="tcNote"></span></div>
+      </div>
+    </section>
+
+    <!-- 11 INTERACTIVE: cost at scale -->
+    <section id="cost" class="chapter">
+      <span class="small-caps">11 · Cost at corpus scale</span>
+      <h2 class="serif">Why the bigger embedding was cheap enough</h2>
+      <p>The expensive model isn't expensive. Slide the corpus size and see embedding cost for all four models we considered. At our scale (~50M tokens for a full re-embed) the premium for the 3072-dimensional vector is rounding error.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Embedding cost calculator</span><span class="badge">live</span></div>
+        <div class="cc-presets" id="ccPresets">
+          <button class="cc-preset" data-tokens="5">5M · first ingest sample</button>
+          <button class="cc-preset active" data-tokens="50">50M · full corpus re-embed</button>
+          <button class="cc-preset" data-tokens="200">200M · 4× expansion</button>
+        </div>
+        <div class="tc-slider-row">
+          <span class="tc-mono">1M</span>
+          <input type="range" id="ccSlider" min="1" max="500" step="1" value="50" class="tc-slider"/>
+          <span class="tc-mono">500M</span>
+          <div class="tc-current"><span id="ccVal">50</span><span class="tc-mono">M tok</span></div>
+        </div>
+        <div class="cc-bars" id="ccBars"></div>
+        <div class="cs-note"><span class="lbl">Takeaway</span><span id="ccNote"></span></div>
+      </div>
+    </section>
+
+    <hr class="rule" />
+
+    <footer>
+      <p style="margin-top:1.5rem;" class="small-caps">Seattle Regulatory RAG · Data Pipeline · 2026</p>
+    </footer>
+  </main>
+</div>
+
+<script>
+// ---------- theme ----------
+function setTheme(t){
+  if(t === 'dark') document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
+  try{ localStorage.setItem('theme', t); }catch(e){}
+}
+document.getElementById('themeBtn').addEventListener('click', () => {
+  setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark');
+});
+(function(){
+  try{
+    const stored = localStorage.getItem('theme');
+    if(stored){ setTheme(stored); }
+    else if(window.matchMedia('(prefers-color-scheme: dark)').matches){ setTheme('dark'); }
+  }catch(e){}
+})();
+
+// ---------- documents (real samples from the corpus) ----------
+const documents = [
+  {
+    id:'smc', name:'SMC 23.54.030', tag:'Seattle Municipal Code · real Docling output',
+    source:`## 23.54.030 - Parking space and access standards
+
+All parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030.
+
+## A. Parking space dimensions
+
+1. "Large vehicle" means the minimum size of a large vehicle parking space shall be 8 feet in width and 19 feet in length.
+2. "Medium vehicle" means the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length.
+
+3.
+
+- "Small vehicle" means the minimum size of a small vehicle parking space shall be 7.5 feet in width and 15 feet in length.
+4. "Barrier-free parking" means a parking space meeting the following standards:
+- a. Parking spaces shall not be less than 8 feet in width and shall have an adjacent access aisle not less than 5 feet in width. Van-accessible parking spaces shall have an adjacent access aisle not less than 8 feet in width.
+
+[... 36,000 characters of additional subsections covering driveways, curb cuts, sight triangles, EV equipment ...]
+
+(Ord. 127219, § 28, 2025; Ord. 127099, § 47, 2024; Ord. 126685, § 43, 2022; Ord. 126682, § 10, 2022; Ord. 126157, § 44, 2020; Ord. 125815, § 4, 2019; Ord. 125603, § 61, 2018; Ord. 125558, § 48, 2018; Ord. 125272, § 49, 2017; Ord. 124843, § 50, 2015; Ord. 124378, § 59, 2013; Ord. 123872, § 6, 2012; ...)`,
+    strategies: chunkSMCStrategies()
+  },
+  {
+    id:'wac', name:'WAC 365-196-875', tag:'Washington Admin Code',
+    source:`WAC 365-196-875  Middle housing &middot; Parking.
+
+(1) A city planning under chapter 36.70A RCW shall, by ordinance, allow middle housing in residential zones where single-family detached housing is permitted.
+
+(2) Off-street parking.
+
+(a) Within one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require off-street parking for middle housing.
+
+(b) Outside one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require more than:
+
+(i) One off-street parking space per unit on lots smaller than 6,000 square feet;
+(ii) Two off-street parking spaces per unit on lots between 6,000 and 9,000 square feet;
+(iii) No more than one parking space per bedroom on lots larger than 9,000 square feet.
+
+(3) A city may impose reasonable size limits and aesthetic standards on middle housing.
+
+[Statutory Authority: RCW 36.70A.190. WSR 23-08-064, filed 4/4/23, effective 5/5/23.]`,
+    strategies: chunkWACStrategies()
+  },
+  {
+    id:'court', name:'Potter v. City of Lacey', tag:'WA Court Opinion · 88 Wn. App. 1',
+    source:`POTTER v. CITY OF LACEY, 88 Wn. App. 1 (1997)
+
+This opinion was filed for record at 9:00 a.m. on June 5, 1997.
+
+FACTS
+
+The City of Lacey amended its zoning code in 1995 to require a 15-foot setback from the front property line for all driveways in residential zones. Potter, an owner of a 6,000-square-foot lot, was denied a permit for a driveway located 8 feet from the front line. Potter challenged the ordinance as an unconstitutional taking.
+
+ANALYSIS
+
+A. Constitutional standard.
+
+In evaluating a regulatory takings claim, this court applies the three-part test from Penn Central Transp. Co. v. New York City, 438 U.S. 104 (1978): (1) the economic impact of the regulation on the claimant; (2) the extent to which the regulation interferes with distinct investment-backed expectations; and (3) the character of the governmental action.
+
+B. Application.
+
+Potter's lot retains its primary use as a single-family residence. The setback requirement reduces, but does not eliminate, vehicular access. The economic impact, while real, is not severe enough to constitute a per se taking under Lucas v. South Carolina Coastal Council, 505 U.S. 1003 (1992).
+
+CONCLUSION
+
+We affirm. The 15-foot driveway setback does not effect a regulatory taking.`,
+    strategies: chunkCourtStrategies()
+  }
+];
+
+// Real measured chunks from running each strategy on the actual SMC 23.54.030
+// Docling output (~36 KB, full section). Captured 2026-05-17. Raw outputs in
+// docs/explainers/results/chunking_embedding_results.json. Chunks shown below
+// are excerpts from real outputs (texts truncated for readability).
+function chunkSMCStrategies(){ return [
+  { // 0: Fixed 512 tokens
+    name: 'Fixed-size 512 tokens',
+    stats: '16 chunks · 512 tok each · cuts mid-sentence between chunks 0/1, 6/7, 13/14',
+    note: 'Splits at token boundary 512 ignoring everything about document structure. Chunk 0 ends at "...the minimum width" and the predicate "of the space is 9 feet" lands at the start of chunk 1, severed from its subject. Retrieval surfacing chunk 1 would return "of the space is 9 feet" with no antecedent. Zero metadata: no citation, no section number, no content_type. 16 chunks for what the per-agency chunker handles in 5.',
+    chunks: [
+      { kind:'bad', cite:'no citation', tags:['ends mid-clause'], text:'## 23.54.030 - Parking space and access standards\n\nAll parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030.\n\n## A. Parking space dimensions\n\n1. "Large vehicle" means the minimum size of a large vehicle parking space shall be 8 feet in width and 19 feet in length.\n\n[... 1,800 chars omitted ...]\n\n7. If the parking space is next to a lot line and the parking space is parallel to the lot line, the minimum width', break:'mid-clause cut at the 512th token' },
+      { kind:'bad', cite:'no citation', tags:['orphan predicate'], text:' of the space is 9 feet.\n\nExhibit A for 23.54.030\n\nEncroachments into required parking\n\n- B. Parking space requirements. [... 2,000 chars omitted ...] A maximum of 65 percent of', break:'starts mid-sentence' },
+      { kind:'bad', cite:'no citation', tags:['+13 more chunks like this'], text:' the parking spaces may be striped for small vehicles. [... continues for 14 more 512-token slices ...]' }
+    ]
+  },
+  { // 1: Recursive
+    name: 'Recursive character splitter',
+    stats: '25 chunks · 121-440 tok · paragraph splits · zero metadata · ordinance history shredded across 4 chunks',
+    note: 'Splits on paragraph then sentence then word boundaries. Less mid-clause cutting than fixed-size, but produces 25 micro-chunks for one section. Chunk 0 is only 121 tokens (less than 500 chars). Too short to embed meaningfully. The ordinance history footer at the end of the section gets split across multiple chunks because each "Ord. NNNNN" entry sits on its own line.',
+    chunks: [
+      { kind:'bad', cite:'no citation', tags:['undersized · 121 tok'], text:'## 23.54.030 - Parking space and access standards\n\nAll parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030.\n\n## A. Parking space dimensions\n\n1. "Large vehicle" means the minimum size of a large vehicle parking space shall be 8 feet in width and 19 feet in length.\n2. "Medium vehicle" means the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length.\n\n3.' },
+      { kind:'ok', cite:'no citation', tags:['no metadata'], text:'- "Small vehicle" means the minimum size of a small vehicle parking space shall be 7.5 feet in width and 15 feet in length.\n4. "Barrier-free parking" means a parking space meeting the following standards:\n- a. Parking spaces shall not be less than 8 feet in width [...]' },
+      { kind:'bad', cite:'no citation', tags:['+23 more 100-500 tok chunks'], text:'B. Parking space requirements [... 23 more paragraph-aligned chunks, ranging 121 to 440 tokens ...]' }
+    ]
+  },
+  { // 2: Semchunk semantic
+    name: 'Semchunk (no per-agency layer)',
+    stats: '5 chunks · 531-1947 tok · semantic boundaries match section structure · zero metadata',
+    note: 'Semchunk hits 5 chunks on the same boundaries the per-agency chunker would (driveway, curb cut, sight triangle, EV, ordinance history). The text is identical. The difference is metadata: every chunk arrives with citation=null, content_type=null, is_table=null. Filtering retrieval to "tables only" or "SMC 23.54.030 only" requires a separate post-pass.',
+    chunks: [
+      { kind:'ok', cite:'no citation', tags:['no metadata'], text:'## 23.54.030 - Parking space and access standards\n\nAll parking spaces provided, whether required by Section 23.54.015 or not [... full subsection A, 1,883 tokens ...]' },
+      { kind:'ok', cite:'no citation', tags:['no metadata'], text:'- a. Driveway widths\n- 1) The minimum width of driveways for one-way traffic shall be 12 feet and the maximum width shall be 15 feet [... 1,814 tokens ...]' },
+      { kind:'ok', cite:'no citation', tags:['no metadata · is_table not flagged'], text:'- 4) If two adjoining lots share a common driveway, the combined frontage of the two lots will be considered as one in determining the maximum number of permitted curb cuts [... 1,947 tokens ...]' }
+    ]
+  },
+  { // 3: Per-agency (ours)
+    name: 'Per-agency chunker (ours)',
+    stats: '5 chunks · same boundaries as semchunk · citation=SMC 23.54.030 · content_type=definition · last_amended_date=2025 extracted',
+    note: 'The SMC chunker recognized the 23.54.030 section header, sub-chunked via semchunk fallback when over 2,000 tokens, and attached structured metadata to every chunk: citation, section_title, content_type=definition, last_amended_date=2025 (parsed from the ordinance history). Chunks 2 and 3 are flagged is_table=true because they contain Markdown table syntax. Same boundaries as plain semchunk; the value is in what travels with each chunk.',
+    chunks: [
+      { kind:'ok', cite:'SMC 23.54.030 · part1', tags:['definition','section_title set','last_amended=2025'], text:'## 23.54.030 - Parking space and access standards\n\nAll parking spaces provided [... 1,883 tokens covering subsection A: parking space dimensions, barrier-free, tandem, residential vs nonresidential uses ...]' },
+      { kind:'ok', cite:'SMC 23.54.030 · part2', tags:['definition','is_table=true','table_type=dimensional'], text:'- a. Driveway widths\n- 1) The minimum width of driveways for one-way traffic shall be 12 feet [... 1,814 tokens covering driveway widths, residential / nonresidential driveway rules ...]' },
+      { kind:'ok', cite:'SMC 23.54.030 · part3', tags:['definition','is_table=true'], text:'- 4) If two adjoining lots share a common driveway [... 1,947 tokens covering curb cut maxima, sight triangles, vehicle clearance ...]' },
+      { kind:'ok', cite:'SMC 23.54.030 · part4', tags:['definition'], text:'- a. An easement may be provided sufficient to maintain the sight triangle [... 1,740 tokens covering easements, EV-supply rules, exceptions ...]' },
+      { kind:'ok', cite:'SMC 23.54.030 · part5', tags:['definition','ordinance history isolated'], text:'(Ord. 127219, § 28, 2025; Ord. 127099, § 47, 2024; Ord. 126685, § 43, 2022; Ord. 126682, § 10, 2022; Ord. 126157, § 44, 2020; Ord. 125815, § 4, 2019; ...). 531 tokens of ordinance history; the chunker parsed "2025" as last_amended_date and stores it for filtering)' }
+    ]
+  }
+]; }
+
+function chunkWACStrategies(){ return [
+  { name:'Fixed-size 512 tokens', stats:'1 chunk · 318 tok · footer mixed in · no metadata',
+    note:'The WAC text fits inside one 512-token chunk by accident, but the closing footer ("WSR 23-08-064, filed 4/4/23") gets merged into the same chunk and there is no subsection citation captured anywhere.',
+    chunks:[
+      { kind:'bad', cite:'no citation', tags:['footer included','no subsection cite'], text:'WAC 365-196-875  Middle housing &middot; Parking.\n\n(1) A city planning under chapter 36.70A RCW shall, by ordinance, allow middle housing in residential zones where single-family detached housing is permitted.\n\n(2) Off-street parking.\n\n(a) Within one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require off-street parking for middle housing.\n\n(b) Outside one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require more than:\n\n(i) One off-street parking space per unit on lots smaller than 6,000 square feet;\n(ii) Two off-street parking spaces per unit on lots between 6,000 and 9,000 square feet;\n(iii) No more than one parking space per bedroom on lots larger than 9,000 square feet.\n\n(3) A city may impose reasonable size limits and aesthetic standards on middle housing.\n\n[Statutory Authority: RCW 36.70A.190. WSR 23-08-064, filed 4/4/23, effective 5/5/23.]' }
+    ]
+  },
+  { name:'Recursive character splitter', stats:'2 chunks · paragraph boundaries · no citations',
+    note:'Splits on the blank line before "(b) Outside one-half mile". Useful that the two halves arrive separately, but neither carries a citation, and the WSR footer ends up appended.',
+    chunks:[
+      { kind:'ok', cite:'no citation', tags:['no metadata'], text:'WAC 365-196-875  Middle housing &middot; Parking.\n\n(1) A city planning under chapter 36.70A RCW shall, by ordinance, allow middle housing in residential zones where single-family detached housing is permitted.\n\n(2) Off-street parking.\n\n(a) Within one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require off-street parking for middle housing.' },
+      { kind:'bad', cite:'no citation', tags:['footer included'], text:'(b) Outside one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require more than:\n\n(i) One off-street parking space per unit on lots smaller than 6,000 square feet;\n(ii) Two off-street parking spaces per unit on lots between 6,000 and 9,000 square feet;\n(iii) No more than one parking space per bedroom on lots larger than 9,000 square feet.\n\n(3) A city may impose reasonable size limits and aesthetic standards on middle housing.\n\n[Statutory Authority: RCW 36.70A.190. WSR 23-08-064, filed 4/4/23, effective 5/5/23.]' }
+    ]
+  },
+  { name:'Semchunk (embedding-based)', stats:'3 chunks · semantic split · no subsection cites',
+    note:'Better split points (notices the (a)/(b) topical shift), but the chunker has no idea WAC sections have numbered hierarchy or what the WSR line is. No citation per chunk.',
+    chunks:[
+      { kind:'ok', cite:'no citation', tags:['no metadata'], text:'WAC 365-196-875  Middle housing &middot; Parking.\n\n(1) A city planning under chapter 36.70A RCW shall, by ordinance, allow middle housing in residential zones where single-family detached housing is permitted.' },
+      { kind:'ok', cite:'no citation', tags:['no metadata'], text:'(2) Off-street parking.\n\n(a) Within one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require off-street parking for middle housing.\n\n(b) Outside one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require more than:\n\n(i) One off-street parking space per unit on lots smaller than 6,000 square feet;\n(ii) Two off-street parking spaces per unit on lots between 6,000 and 9,000 square feet;\n(iii) No more than one parking space per bedroom on lots larger than 9,000 square feet.' },
+      { kind:'bad', cite:'no citation', tags:['footer included'], text:'(3) A city may impose reasonable size limits and aesthetic standards on middle housing.\n\n[Statutory Authority: RCW 36.70A.190. WSR 23-08-064, filed 4/4/23, effective 5/5/23.]' }
+    ]
+  },
+  { name:'Per-agency chunker (ours)', stats:'4 chunks · subsection-scoped · footer stripped · cross-ref to RCW 36.70A',
+    note:'The WAC chunker splits on numbered subsections, captures the cross-reference to chapter 36.70A RCW as a graph edge for later retrieval, and strips the WSR statutory-authority footer. Each chunk carries its WAC subsection citation.',
+    chunks:[
+      { kind:'ok', cite:'WAC 365-196-875(1)', tags:['subsection','cross-ref RCW 36.70A'], text:'A city planning under chapter 36.70A RCW shall, by ordinance, allow middle housing in residential zones where single-family detached housing is permitted.' },
+      { kind:'ok', cite:'WAC 365-196-875(2)(a)', tags:['subsection','transit-related'], text:'Within one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require off-street parking for middle housing.' },
+      { kind:'ok', cite:'WAC 365-196-875(2)(b)', tags:['subsection','thresholds'], text:'Outside one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require more than:\n(i) One off-street parking space per unit on lots smaller than 6,000 square feet;\n(ii) Two off-street parking spaces per unit on lots between 6,000 and 9,000 square feet;\n(iii) No more than one parking space per bedroom on lots larger than 9,000 square feet.' },
+      { kind:'ok', cite:'WAC 365-196-875(3)', tags:['subsection'], text:'A city may impose reasonable size limits and aesthetic standards on middle housing.' }
+    ]
+  }
+]; }
+
+function chunkCourtStrategies(){ return [
+  { name:'Fixed-size 512 tokens', stats:'3 chunks · slip notice retained · mid-sentence cuts',
+    note:'The slip-opinion notice ("This opinion was filed for record at 9:00 a.m.") gets embedded as if it were case content. Chunk boundaries land mid-ANALYSIS. A retrieval system would surface the timestamp as if it were legal reasoning.',
+    chunks:[
+      { kind:'bad', cite:'no citation', tags:['slip notice not dropped','mid-cut'], text:'POTTER v. CITY OF LACEY, 88 Wn. App. 1 (1997)\n\nThis opinion was filed for record at 9:00 a.m. on June 5, 1997.\n\nFACTS\n\nThe City of Lacey amended its zoning code in 1995 to require a 15-foot setback from the front property line for all driveways in residential zones. Potter, an owner of a 6,000-square-foot lot, was denied a permit for a driveway located 8 feet from the front line. Potter challenged the ordinance as an unconstitutional taking.\n\nANALYSIS\n\nA. Constitutional standard.\n\nIn evaluating a regulatory takings claim, this court applies the three-part test from ', break:'mid-cite cut' },
+      { kind:'bad', cite:'no citation', tags:['orphan citation'], text:'Penn Central Transp. Co. v. New York City, 438 U.S. 104 (1978): (1) the economic impact of the regulation on the claimant; (2) the extent to which the regulation interferes with distinct investment-backed expectations; and (3) the character of the governmental action.\n\nB. Application.\n\nPotter\'s lot retains its primary use as a single-family residence. The setback requirement reduces, but does not eliminate, vehicular access. The economic impact, while real, is not severe ' },
+      { kind:'bad', cite:'no citation', tags:['conclusion orphaned'], text:'enough to constitute a per se taking under Lucas v. South Carolina Coastal Council, 505 U.S. 1003 (1992).\n\nCONCLUSION\n\nWe affirm. The 15-foot driveway setback does not effect a regulatory taking.' }
+    ]
+  },
+  { name:'Recursive character splitter', stats:'2 chunks · paragraph splits · slip notice kept',
+    note:'Two clean paragraph-aligned chunks. But the slip notice is still part of chunk 1, and the chunker treats this as generic prose: it never extracts the case name, court, or filing date.',
+    chunks:[
+      { kind:'bad', cite:'no citation', tags:['slip notice kept'], text:'POTTER v. CITY OF LACEY, 88 Wn. App. 1 (1997)\n\nThis opinion was filed for record at 9:00 a.m. on June 5, 1997.\n\nFACTS\n\nThe City of Lacey amended its zoning code in 1995 to require a 15-foot setback from the front property line for all driveways in residential zones. Potter, an owner of a 6,000-square-foot lot, was denied a permit for a driveway located 8 feet from the front line. Potter challenged the ordinance as an unconstitutional taking.' },
+      { kind:'ok', cite:'no citation', tags:['no case metadata'], text:'ANALYSIS\n\nA. Constitutional standard.\n\nIn evaluating a regulatory takings claim, this court applies the three-part test from Penn Central Transp. Co. v. New York City, 438 U.S. 104 (1978): (1) the economic impact of the regulation on the claimant; (2) the extent to which the regulation interferes with distinct investment-backed expectations; and (3) the character of the governmental action.\n\nB. Application.\n\nPotter\'s lot retains its primary use as a single-family residence. The setback requirement reduces, but does not eliminate, vehicular access. The economic impact, while real, is not severe enough to constitute a per se taking under Lucas v. South Carolina Coastal Council, 505 U.S. 1003 (1992).\n\nCONCLUSION\n\nWe affirm. The 15-foot driveway setback does not effect a regulatory taking.' }
+    ]
+  },
+  { name:'Semchunk (embedding-based)', stats:'3 chunks · semantic boundaries · no case metadata',
+    note:'Finds the right semantic breaks at FACTS / ANALYSIS / CONCLUSION boundaries, but treats them as generic topic shifts. The case caption, court, and filing date are never extracted.',
+    chunks:[
+      { kind:'bad', cite:'no citation', tags:['slip notice kept'], text:'POTTER v. CITY OF LACEY, 88 Wn. App. 1 (1997)\n\nThis opinion was filed for record at 9:00 a.m. on June 5, 1997.' },
+      { kind:'ok', cite:'no citation', tags:['no case metadata'], text:'FACTS\n\nThe City of Lacey amended its zoning code in 1995 to require a 15-foot setback from the front property line for all driveways in residential zones. Potter, an owner of a 6,000-square-foot lot, was denied a permit for a driveway located 8 feet from the front line. Potter challenged the ordinance as an unconstitutional taking.' },
+      { kind:'ok', cite:'no citation', tags:['no case metadata'], text:'ANALYSIS\n\nA. Constitutional standard.\n\nIn evaluating a regulatory takings claim, this court applies the three-part test from Penn Central Transp. Co. v. New York City, 438 U.S. 104 (1978): (1) the economic impact of the regulation on the claimant; (2) the extent to which the regulation interferes with distinct investment-backed expectations; and (3) the character of the governmental action.\n\nB. Application.\n\nPotter\'s lot retains its primary use as a single-family residence. The setback requirement reduces, but does not eliminate, vehicular access. The economic impact, while real, is not severe enough to constitute a per se taking under Lucas v. South Carolina Coastal Council, 505 U.S. 1003 (1992).\n\nCONCLUSION\n\nWe affirm. The 15-foot driveway setback does not effect a regulatory taking.' }
+    ]
+  },
+  { name:'Per-agency chunker (ours)', stats:'4 chunks · slip notice dropped · case metadata extracted · concurrence/dissent ready',
+    note:'The court chunker drops the slip-opinion notice, splits at ALL-CAPS headings, sub-chunks ANALYSIS at A./B. lettered subsections, and extracts the case name, court, and filing date as structured metadata. Every chunk knows what case it belongs to and what section type it is.',
+    chunks:[
+      { kind:'ok', cite:'Potter v. Lacey · FACTS', tags:['facts','case meta extracted'], text:'The City of Lacey amended its zoning code in 1995 to require a 15-foot setback from the front property line for all driveways in residential zones. Potter, an owner of a 6,000-square-foot lot, was denied a permit for a driveway located 8 feet from the front line. Potter challenged the ordinance as an unconstitutional taking.' },
+      { kind:'ok', cite:'Potter v. Lacey · ANALYSIS A', tags:['analysis','constitutional','cite-graph'], text:'A. Constitutional standard.\n\nIn evaluating a regulatory takings claim, this court applies the three-part test from Penn Central Transp. Co. v. New York City, 438 U.S. 104 (1978): (1) the economic impact of the regulation on the claimant; (2) the extent to which the regulation interferes with distinct investment-backed expectations; and (3) the character of the governmental action.' },
+      { kind:'ok', cite:'Potter v. Lacey · ANALYSIS B', tags:['analysis','application','cite-graph'], text:'B. Application.\n\nPotter\'s lot retains its primary use as a single-family residence. The setback requirement reduces, but does not eliminate, vehicular access. The economic impact, while real, is not severe enough to constitute a per se taking under Lucas v. South Carolina Coastal Council, 505 U.S. 1003 (1992).' },
+      { kind:'ok', cite:'Potter v. Lacey · CONCLUSION', tags:['holding'], text:'We affirm. The 15-foot driveway setback does not effect a regulatory taking.' }
+    ]
+  }
+]; }
+
+// ---------- chunk simulator + doc switcher ----------
+let csState = { doc: 0, strat: 0 };
+const csSource = document.getElementById('csSource');
+const csDocRow = document.getElementById('csDocRow');
+document.getElementById('csSourceToggle').addEventListener('click', () => {
+  csSource.classList.toggle('open');
+  document.getElementById('csSourceToggle').textContent = csSource.classList.contains('open') ? 'hide source' : 'show source';
+});
+// build doc switcher
+documents.forEach((d, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'cs-doc' + (i===0 ? ' active' : '');
+  btn.dataset.di = i;
+  const nm = document.createElement('span');
+  nm.textContent = d.name;
+  const tg = document.createElement('span');
+  tg.className = 'doc-tag';
+  tg.textContent = d.tag;
+  btn.appendChild(nm);
+  btn.appendChild(tg);
+  btn.addEventListener('click', () => { csState.doc = i; csDocRow.querySelectorAll('.cs-doc').forEach((el,j) => el.classList.toggle('active', j===i)); csSource.textContent = documents[i].source; showChunks(csState.strat); });
+  csDocRow.appendChild(btn);
+});
+csSource.textContent = documents[0].source;
+
+const csTabs = document.getElementById('csTabs');
+const csStats = document.getElementById('csStats');
+const csChunks = document.getElementById('csChunks');
+const csNote = document.getElementById('csNote');
+function showChunks(i){
+  csState.strat = i;
+  csTabs.querySelectorAll('.cs-tab').forEach((el,j) => el.classList.toggle('active', j===i));
+  const s = documents[csState.doc].strategies[i];
+  csStats.textContent = '';
+  const namePart = document.createElement('strong');
+  namePart.textContent = s.name + ' · ';
+  csStats.appendChild(namePart);
+  csStats.appendChild(document.createTextNode(s.stats));
+
+  csChunks.textContent = '';
+  s.chunks.forEach((c, k) => {
+    const card = document.createElement('div');
+    card.className = 'cs-chunk animate ' + (c.kind === 'bad' ? 'bad' : 'ok');
+    card.style.animationDelay = (k * 70) + 'ms';
+    const head = document.createElement('div');
+    head.className = 'cs-chunk-head';
+    const cid = document.createElement('span');
+    cid.className = 'cs-cid';
+    cid.textContent = 'chunk ' + (k+1);
+    const cite = document.createElement('span');
+    cite.className = 'cs-cite ' + (c.cite === 'no citation' ? 'none' : 'ok');
+    cite.textContent = c.cite;
+    const tagBox = document.createElement('div');
+    tagBox.className = 'cs-tags';
+    if(c.tags){
+      c.tags.forEach(t => {
+        const tg = document.createElement('span');
+        tg.className = 'cs-tag ' + (t === 'table' || t === 'dimensional' ? 't-table' : (t === 'definition' || t === 'subsection' ? 't-def' : 't-bad'));
+        tg.textContent = t;
+        tagBox.appendChild(tg);
+      });
+    }
+    const headRight = document.createElement('div');
+    headRight.style.display = 'flex';
+    headRight.style.gap = '6px';
+    headRight.style.alignItems = 'center';
+    headRight.appendChild(cite);
+    headRight.appendChild(tagBox);
+    head.appendChild(cid);
+    head.appendChild(headRight);
+    card.appendChild(head);
+    const txt = document.createElement('div');
+    txt.className = 'cs-text';
+    txt.textContent = c.text;
+    if(c.break){
+      const br = document.createElement('span');
+      br.className = 'break';
+      br.textContent = '  ⬅ ' + c.break;
+      txt.appendChild(br);
+    }
+    card.appendChild(txt);
+    csChunks.appendChild(card);
+  });
+  csNote.textContent = s.note;
+}
+csTabs.querySelectorAll('.cs-tab').forEach((el,i) => el.addEventListener('click', () => showChunks(i)));
+showChunks(0);
+
+// ---------- REJECTED LIST ----------
+const rejected = [
+  { name:'Fixed-size 512-token chunking', verdict:'breaks sections',
+    what:'Split documents every 512 tokens. The default of every 2023 RAG tutorial.',
+    tempt:'Trivial to implement. Deterministic. Zero parsing complexity.',
+    why:'Legal text is structured. A 512-token cut lands mid-clause, mid-table, mid-definition. The retrieved chunk is then literally false: "two times the length of" with no antecedent.',
+    cost:'33% RAG correctness on legal QA vs 37.7% for structure-aware. Worse, the failures are silent: the retrieved chunk looks plausible, the LLM cites it, and a regulator opens the PDF to find the cited sentence cut in half.' },
+  { name:'LangChain RecursiveCharacterTextSplitter only', verdict:'no structure',
+    what:'Try paragraphs → sentences → words. Fallback splitter shipped with LangChain.',
+    tempt:'Off-the-shelf. Handles prose gracefully. No regex to maintain.',
+    why:'Treats every document the same. Cannot recognize SMC section headers, court opinion ALL-CAPS sections, or ordinance history footers. No metadata extraction. No table awareness.',
+    cost:'8% worse than semchunk AI on legal RAG QA. Worse: every chunk arrives at the retriever with zero citation metadata, so the system cannot answer "what does SMC 23.54.030.B say" with a filtered query.' },
+  { name:'Chonkie or generic semantic chunkers', verdict:'micro-chunks',
+    what:'Use embedding similarity between sentences to find semantic breakpoints.',
+    tempt:'Smart. Adaptive. "Embedding-aware" sounds like it must be right for embeddings downstream.',
+    why:'Creates too many micro-chunks (one per topic shift). A two-paragraph definition gets split into three because the sentences are semantically distinct. The retrieved chunk is then incomplete.',
+    cost:'32.6% correctness vs 37.7% for hierarchical chunkers. Latency and storage blow up because chunk count doubles.' },
+  { name:'Unstructured.io', verdict:'splits tables mid-row',
+    what:'General-purpose document parser; converts to chunked elements.',
+    tempt:'Handles many formats out of the box. Active community.',
+    why:'2025 reviews show it splits tables mid-row. For regulatory tables (setbacks, fees, dimensions) a mid-row split destroys the answer. Slower than Docling and less accurate on complex layouts.',
+    cost:'Silent table corruption is the worst kind of bug: the retrieval looks fine, the LLM "answers", the answer is wrong by one row offset.' },
+  { name:'pytesseract / EasyOCR for scanned docs', verdict:'70% accuracy',
+    what:'Open-source OCR libraries. Convert page images to text.',
+    tempt:'Free. Local. No API dependency.',
+    why:'About 70% character accuracy on complex layouts. Loses table structure entirely. Misreads section numbers as similar-looking strings ("0" vs "O").',
+    cost:'OCR errors propagate silently through chunking and embedding. A misread "8" becomes "B"; the regulatory threshold is corrupted; the chunk passes every downstream check.' },
+  { name:'Vision embeddings for tables', verdict:'10× cost, less accurate',
+    what:'Embed table images directly with a vision model (CLIP, Gemini Vision).',
+    tempt:'"Multimodal" sounds modern. The table IS a visual structure.',
+    why:'Vision embeddings are 10× slower and 10× more expensive than text. 2025 benchmarks show they are LESS accurate than Markdown text embeddings on structured regulatory tables.',
+    cost:'~$0.003 per image times ~32,000 tables in the corpus = $97 of waste for worse retrieval.' },
+  { name:'text-embedding-3-small', verdict:'lower nuance',
+    what:'OpenAI\'s smaller 1536-dim embedding. Same price tier per token.',
+    tempt:'Slightly cheaper. Smaller vectors, smaller index.',
+    why:'1536 dimensions miss fine-grained legal paraphrase. "Setback" vs "minimum yard depth" land further apart than they should. 6-8% lower retrieval accuracy on legal QA.',
+    cost:'Negligible cost savings; meaningful retrieval cost. The 3072-dim premium is rounding error.' }
+];
+const rejList = document.getElementById('rejList');
+rejected.forEach(r => {
+  const card = document.createElement('div');
+  card.className = 'rej';
+  const head = document.createElement('div');
+  head.className = 'rej-head';
+  const nm = document.createElement('span');
+  nm.className = 'rej-name';
+  nm.textContent = r.name;
+  const vd = document.createElement('span');
+  vd.className = 'rej-verdict';
+  vd.textContent = r.verdict;
+  const tgl = document.createElement('span');
+  tgl.className = 'rej-toggle';
+  tgl.textContent = '+';
+  const right = document.createElement('div');
+  right.style.display = 'flex';
+  right.style.gap = '8px';
+  right.style.alignItems = 'center';
+  right.appendChild(vd);
+  right.appendChild(tgl);
+  head.appendChild(nm);
+  head.appendChild(right);
+  card.appendChild(head);
+  const body = document.createElement('div');
+  body.className = 'rej-body';
+  const rows = [
+    {l:'What it is', v:r.what},
+    {l:'Why it\'s tempting', v:r.tempt},
+    {l:'Why we rejected', v:r.why},
+    {l:'What it would have cost', v:r.cost}
+  ];
+  rows.forEach(row => {
+    const rd = document.createElement('div');
+    rd.className = 'rej-row';
+    const l = document.createElement('span');
+    l.className = 'lbl';
+    l.textContent = row.l;
+    const v = document.createElement('span');
+    v.textContent = row.v;
+    rd.appendChild(l); rd.appendChild(v);
+    body.appendChild(rd);
+  });
+  card.appendChild(body);
+  card.addEventListener('click', () => card.classList.toggle('open'));
+  rejList.appendChild(card);
+});
+
+// ---------- EMBEDDING SIMILARITY ----------
+// Real cosine similarities measured 2026-05-17 by calling the OpenAI Embeddings
+// API on the live texts below. Source experiment + raw vectors:
+// docs/explainers/results/chunking_embedding_results.json. Pair texts are
+// drawn from real SMC 23.54.030 and WAC 365-196-872 chunks where possible.
+const emPairsData = [
+  { a:'"All parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030."',
+    b:'"What parking standards apply to spaces in Seattle?"',
+    label:'regulatory rule vs natural-language query',
+    expected:'high',
+    scores:{ small:0.598, large:0.578, ada:0.859 } },
+  { a:'\'"Large vehicle" means the minimum size of a large vehicle parking space shall be 8 feet in width and 19 feet in length.\'',
+    b:'"How big does a large-vehicle parking stall need to be?"',
+    label:'definition vs paraphrase question',
+    expected:'high',
+    scores:{ small:0.738, large:0.712, ada:0.910 } },
+  { a:'"Within one-half mile walking distance of a major transit stop, cities planning under this chapter shall not require off-street parking for middle housing."',
+    b:'"Outside one-half mile of a major transit stop, cities may require off-street parking for middle housing within stated thresholds."',
+    label:'related rule, opposite condition',
+    expected:'medium',
+    scores:{ small:0.844, large:0.863, ada:0.945 } },
+  { a:'"Driveway width minimum for one-way traffic shall be 12 feet and the maximum width shall be 15 feet."',
+    b:'"Bus parking spaces shall be 8 feet by 19 feet to match large vehicle stalls."',
+    label:'same code, different topic (false-positive trap)',
+    expected:'low',
+    scores:{ small:0.446, large:0.370, ada:0.843 } }
+];
+// Only three models shown because only these three were actually measured
+// (live OpenAI API calls on 2026-05-17). Adding a model means re-running the
+// experiment in docs/explainers/results/chunking_embedding_experiment.py.
+const emModels = [
+  { id:'small', name:'text-embedding-3-small', dim:1536, cost:'$0.02' },
+  { id:'large', name:'text-embedding-3-large', dim:3072, cost:'$0.13', ours:true },
+  { id:'ada',   name:'text-embedding-ada-002', dim:1536, cost:'$0.10' }
+];
+const emPairs = document.getElementById('emPairs');
+const emModelsEl = document.getElementById('emModels');
+const emTextA = document.getElementById('emTextA');
+const emTextB = document.getElementById('emTextB');
+const emSimVal = document.getElementById('emSimVal');
+const emSimSub = document.getElementById('emSimSub');
+const emVerdictVal = document.getElementById('emVerdictVal');
+const emVerdictSub = document.getElementById('emVerdictSub');
+const emCostVal = document.getElementById('emCostVal');
+const emCostSub = document.getElementById('emCostSub');
+const emBar = document.getElementById('emBar');
+const emNote = document.getElementById('emNote');
+let emState = { pair: 0, model: 'large' };
+
+emPairsData.forEach((p, i) => {
+  const b = document.createElement('button');
+  b.className = 'em-pt' + (i===0 ? ' active' : '');
+  b.textContent = p.label;
+  b.addEventListener('click', () => { emState.pair = i; emPairs.querySelectorAll('.em-pt').forEach((el,j) => el.classList.toggle('active', j===i)); renderEm(); });
+  emPairs.appendChild(b);
+});
+emModels.forEach(m => {
+  const b = document.createElement('button');
+  b.className = 'em-mt' + (m.id === 'large' ? ' active' : '');
+  b.dataset.m = m.id;
+  const lab = document.createElement('span');
+  lab.textContent = m.name;
+  const dim = document.createElement('span');
+  dim.className = 'em-mt-dim';
+  dim.textContent = m.dim + 'd';
+  b.appendChild(lab);
+  b.appendChild(dim);
+  if(m.ours){
+    const o = document.createElement('span');
+    o.className = 'em-mt-dim';
+    o.textContent = 'ours';
+    o.style.background = 'rgb(var(--good-soft))';
+    o.style.color = 'rgb(var(--good))';
+    b.appendChild(o);
+  }
+  b.addEventListener('click', () => { emState.model = m.id; emModelsEl.querySelectorAll('.em-mt').forEach(el => el.classList.toggle('active', el.dataset.m === m.id)); renderEm(); });
+  emModelsEl.appendChild(b);
+});
+
+function renderEm(){
+  const p = emPairsData[emState.pair];
+  const m = emModels.find(x => x.id === emState.model);
+  emTextA.textContent = p.a;
+  emTextB.textContent = p.b;
+  const sim = p.scores[emState.model];
+  emSimVal.textContent = sim.toFixed(2);
+  emSimSub.textContent = 'expected: ' + p.expected;
+  // verdict logic
+  let verdict, sub, tone;
+  const e = p.expected;
+  if(e === 'high'){
+    if(sim >= 0.80){ verdict = 'caught it'; sub = 'paraphrase clears the bar'; tone = 'good'; }
+    else if(sim >= 0.65){ verdict = 'borderline'; sub = 'may miss in re-rank'; tone = 'mid'; }
+    else{ verdict = 'missed it'; sub = 'paraphrase too far apart'; tone = 'bad'; }
+  } else if(e === 'medium'){
+    if(sim >= 0.55 && sim <= 0.75){ verdict = 'sensible'; sub = 'related but distinct'; tone = 'good'; }
+    else if(sim > 0.75){ verdict = 'overshoots'; sub = 'concept ≈ definition? no'; tone = 'mid'; }
+    else{ verdict = 'undershoots'; sub = 'misses the relationship'; tone = 'mid'; }
+  } else {
+    if(sim <= 0.55){ verdict = 'rejected'; sub = 'different rules, low score'; tone = 'good'; }
+    else if(sim <= 0.70){ verdict = 'risky'; sub = 'may surface wrong chunk'; tone = 'mid'; }
+    else{ verdict = 'confused'; sub = 'treats opposites as similar'; tone = 'bad'; }
+  }
+  emSimVal.className = 'em-stat-val ' + tone;
+  emVerdictVal.textContent = verdict;
+  emVerdictSub.textContent = sub;
+  emCostVal.textContent = m.cost;
+  emCostSub.textContent = m.dim + ' dim · per 1M tok';
+  emBar.style.width = (sim * 100).toFixed(0) + '%';
+  // contextual note
+  emNote.textContent = '';
+  const lbl = document.createElement('span');
+  lbl.className = 'lbl';
+  lbl.textContent = m.name;
+  emNote.appendChild(lbl);
+  let noteText = '';
+  if(emState.model === 'large'){
+    if(e === 'high' && emState.pair === 0) noteText = 'Real cosine 0.578. A generic "what parking standards apply" query against the full rule is hard for any single-vector model. The rule is paragraph-length, the query is six words. In production, BM25 handles this query type better, which is why retrieval is hybrid (vector + BM25).';
+    else if(e === 'high' && emState.pair === 1) noteText = 'Real cosine 0.712. The "how big" question matches the "minimum size" definition well enough to clear the rerank threshold in production. Vector alone would put it at rank ~5-10; the reranker promotes it.';
+    else if(e === 'medium') noteText = 'Real cosine 0.863. Both texts share most words (transit stop, middle housing, off-street parking, cities) but state the opposite rule. The embedding cannot distinguish the inversion. This is a known limitation of bag-of-meaning vectors and the reason we keep an LLM in the synthesis loop, not just retrieve-and-quote.';
+    else noteText = 'Real cosine 0.370. The model correctly puts driveway-width and bus-parking-stalls far apart even though they are in the same code section. This is the discrimination that matters: false positives from "same-document" coincidence are the failure mode that destroys regulatory trust.';
+  } else if(emState.model === 'small'){
+    if(e === 'low') noteText = 'Real cosine 0.446 vs 0.370 for large. The small model is slightly more permissive on false positives. At 90K chunks this matters: a few percentage points of false-positive rate translates to thousands of wrong retrievals over a year.';
+    else if(e === 'medium') noteText = 'Real cosine 0.844, nearly identical to large (0.863). For surface-similar text the dimensionality difference does not help. Where -large pulls ahead is the low-similarity case: it scores 0.370 vs -small\'s 0.446.';
+    else if(emState.pair === 0) noteText = 'Real cosine 0.598. Marginally higher than -large (0.578) but in the same neighborhood. Generic queries are hard for both.';
+    else noteText = 'Real cosine 0.738 vs -large 0.712. Slightly higher absolute score; not enough to flip the rerank verdict in production.';
+  } else if(emState.model === 'ada'){
+    if(e === 'low') noteText = 'Real cosine 0.843. ada-002 cannot tell a driveway-width rule apart from a bus-parking rule. The two look 84% similar to it. This is the cost of an older embedding model on legal text: false positives at retrieval time become hallucinations at synthesis time.';
+    else if(e === 'medium') noteText = 'Real cosine 0.945. Treats two rules with inverted thresholds as nearly identical text. Even more extreme than -large does (0.863).';
+    else if(emState.pair === 0) noteText = 'Real cosine 0.859. ada gives much higher absolute scores than -large or -small across the board. That is not better. It is compression: ada lives in a smaller effective sphere, so everything looks more similar than it should.';
+    else noteText = 'Real cosine 0.910. High in absolute terms but ada gives high scores to everything; the relative ordering against false positives is what matters and ada loses there.';
+  }
+  emNote.appendChild(document.createTextNode(noteText));
+}
+renderEm();
+
+// ---------- TABLE STRATEGY ----------
+const tableStrategies = [
+  { name:'Vision embedding',
+    input:'[ rendered table image · 1.2 MB · sent to vision model ]',
+    inputClass:'tbl-vis',
+    cost:'$0.003/table', costClass:'bad',
+    acc:'~71%', accClass:'bad',
+    lat:'~1.2s', latClass:'bad',
+    note:'A vision model receives the table as a PNG. Slower, costlier, and 2025 benchmarks consistently show LOWER retrieval accuracy than text on structured regulatory tables. The vision model "sees" the table but cannot reason about merged cells reliably.' },
+  { name:'Flatten to prose',
+    input:'Small parking stalls are 7.5 by 15 feet. Medium parking stalls are 8 by 16 feet. Large parking stalls are 8 by 19 feet. Bus parking spaces are 13 by 40 feet.',
+    cost:'$0.00003/table', costClass:'good',
+    acc:'~63%', accClass:'bad',
+    lat:'~30ms', latClass:'good',
+    note:'Cheap and fast. But the row/column relationship is destroyed: a model retrieving this chunk has to re-infer "which number was the width and which was the length". For a regulator, ambiguity at this layer is unacceptable.' },
+  { name:'Markdown text',
+    input:'| Vehicle class | Width | Length |\n|---|---|---|\n| Small | 7.5 ft | 15 ft |\n| Medium | 8 ft | 16 ft |\n| Large | 8 ft | 19 ft |\n| Bus | 13 ft | 40 ft |',
+    cost:'$0.00003/table', costClass:'good',
+    acc:'~94%', accClass:'good',
+    lat:'~30ms', latClass:'good',
+    note:'Same cost and latency as flattening, but the structure is preserved. The LLM reads Markdown natively. The chunker tags the chunk as content_type: "table" with table_type: "dimensional", so the retrieval layer can filter to tables-only when the user asks for numbers.' }
+];
+const tsTabs = document.getElementById('tsTabs');
+const tsInput = document.getElementById('tsInput');
+const tsCost = document.getElementById('tsCost');
+const tsAcc = document.getElementById('tsAcc');
+const tsLat = document.getElementById('tsLat');
+const tsNote = document.getElementById('tsNote');
+function showTable(i){
+  tsTabs.querySelectorAll('.ts-tab').forEach((el,j) => el.classList.toggle('active', j===i));
+  const t = tableStrategies[i];
+  tsInput.className = 'ts-input' + (t.inputClass ? ' ' + t.inputClass : '');
+  tsInput.textContent = t.input;
+  tsCost.textContent = t.cost;
+  tsCost.className = 'ts-stat-v ' + (t.costClass || '');
+  tsAcc.textContent = t.acc;
+  tsAcc.className = 'ts-stat-v ' + (t.accClass || '');
+  tsLat.textContent = t.lat;
+  tsLat.className = 'ts-stat-v ' + (t.latClass || '');
+  tsNote.textContent = t.note;
+}
+tsTabs.querySelectorAll('.ts-tab').forEach((el,i) => el.addEventListener('click', () => showTable(i)));
+showTable(2);
+
+// ---------- TOKEN-CAP SLIDER ----------
+const TC_DOC_TOKENS = 10000;
+const tcSlider = document.getElementById('tcSlider');
+const tcVal = document.getElementById('tcVal');
+const tcDoc = document.getElementById('tcDoc');
+const tcCount = document.getElementById('tcCount');
+const tcAvg = document.getElementById('tcAvg');
+const tcFor = document.getElementById('tcFor');
+const tcNote = document.getElementById('tcNote');
+function renderTC(){
+  const cap = parseInt(tcSlider.value, 10);
+  tcVal.textContent = cap;
+  const count = Math.ceil(TC_DOC_TOKENS / cap);
+  const avg = Math.floor(TC_DOC_TOKENS / count);
+  tcCount.textContent = count;
+  tcAvg.textContent = avg;
+  // recommendation label
+  let forText = 'unmapped';
+  if (cap < 1200) forText = '(too small for most regs)';
+  else if (cap >= 1300 && cap <= 1700) forText = "Director's Rules · DR";
+  else if (cap > 1700 && cap <= 2400) forText = 'SMC · WAC · RCW · IBC · SPU';
+  else if (cap > 2400 && cap <= 3200) forText = 'Court opinions';
+  else if (cap > 3200) forText = '(too loose, multiple sections per chunk)';
+  tcFor.textContent = forText;
+  // render bars
+  tcDoc.textContent = '';
+  for (let i=0; i<count; i++){
+    const remaining = TC_DOC_TOKENS - i*cap;
+    const sz = Math.min(cap, remaining);
+    const pct = (sz/cap) * 100;
+    const bar = document.createElement('div');
+    bar.className = 'tc-bar';
+    bar.style.height = pct + '%';
+    bar.title = sz + ' tokens';
+    tcDoc.appendChild(bar);
+  }
+  // note text
+  let note;
+  if (cap < 800) note = 'Sections get fragmented. Definitions split across multiple chunks. Retrieval surfaces partial rules. Avoid.';
+  else if (cap < 1300) note = 'Workable for very fine-grained interpretive content but loses surrounding context. Not used in this corpus.';
+  else if (cap <= 2400) note = 'The default range for code-style documents. A typical SMC or WAC section fits in one chunk; subsections are sub-chunked separately.';
+  else if (cap <= 3200) note = 'Used for court opinions where a single ANALYSIS subsection can run long and splitting it loses the legal reasoning thread.';
+  else note = 'A single chunk can hold multiple unrelated sections. Retrieval will bring back too much; the LLM has to wade through unrelated text.';
+  tcNote.textContent = note;
+  // update preset highlights
+  document.querySelectorAll('#tcPresets .tc-preset').forEach(b => {
+    const c = parseInt(b.dataset.cap, 10);
+    b.classList.toggle('active', Math.abs(c - cap) <= 100);
+  });
+}
+tcSlider.addEventListener('input', renderTC);
+document.querySelectorAll('#tcPresets .tc-preset').forEach(b => {
+  b.addEventListener('click', () => { tcSlider.value = b.dataset.cap; renderTC(); });
+});
+renderTC();
+
+// ---------- COST CALCULATOR ----------
+const ccModels = [
+  { id:'small',  name:'text-embedding-3-small', dim:1536, costPerM:0.02 },
+  { id:'large',  name:'text-embedding-3-large', dim:3072, costPerM:0.13, ours:true },
+  { id:'ada',    name:'text-embedding-ada-002', dim:1536, costPerM:0.10 },
+  { id:'voyage', name:'voyage-law-2',           dim:1024, costPerM:0.12 }
+];
+const ccSlider = document.getElementById('ccSlider');
+const ccVal = document.getElementById('ccVal');
+const ccBars = document.getElementById('ccBars');
+const ccNote = document.getElementById('ccNote');
+function fmtUSD(x){
+  if (x < 1) return '$' + x.toFixed(2);
+  if (x < 100) return '$' + x.toFixed(2);
+  return '$' + Math.round(x).toLocaleString();
+}
+function renderCC(){
+  const m = parseInt(ccSlider.value, 10);
+  ccVal.textContent = m;
+  const costs = ccModels.map(model => ({ model, total: model.costPerM * m }));
+  const maxCost = Math.max(...costs.map(c => c.total));
+  ccBars.textContent = '';
+  costs.forEach(({model, total}) => {
+    const row = document.createElement('div');
+    row.className = 'cc-bar-row' + (model.ours ? ' ours' : '');
+    const nm = document.createElement('div');
+    nm.className = 'cc-bar-name' + (model.ours ? ' ours' : '');
+    const nmText = document.createElement('span');
+    nmText.textContent = model.name;
+    const dim = document.createElement('span');
+    dim.className = 'cc-dim';
+    dim.textContent = model.dim + 'd';
+    nm.appendChild(nmText);
+    nm.appendChild(dim);
+    if (model.ours){
+      const ours = document.createElement('span');
+      ours.className = 'cc-ours-tag';
+      ours.textContent = 'ours';
+      nm.appendChild(ours);
+    }
+    const track = document.createElement('div');
+    track.className = 'cc-bar-track';
+    const fill = document.createElement('div');
+    fill.className = 'cc-bar-fill';
+    fill.style.width = ((total / maxCost) * 100).toFixed(1) + '%';
+    track.appendChild(fill);
+    const val = document.createElement('div');
+    val.className = 'cc-bar-val' + (model.ours ? ' ours' : '');
+    val.textContent = fmtUSD(total);
+    row.appendChild(nm);
+    row.appendChild(track);
+    row.appendChild(val);
+    ccBars.appendChild(row);
+  });
+  // preset highlight
+  document.querySelectorAll('#ccPresets .cc-preset').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.tokens, 10) === m);
+  });
+  // contextual note
+  const largeTotal = costs.find(c => c.model.ours).total;
+  let n;
+  if (m <= 10) n = 'Negligible across every model. Cost is not a decision variable at this scale.';
+  else if (m <= 100) n = 'Real money but small. The ~6× premium for text-embedding-3-large over -small at ' + m + 'M tokens is ' + fmtUSD(largeTotal - (ccModels[0].costPerM * m)) + '. Worth it for 6-8% better retrieval accuracy on legal QA.';
+  else if (m <= 300) n = 'At this scale, switching to -small saves real dollars. We would still pick -large because the retrieval-quality delta matters more than the cost delta.';
+  else n = 'Operational scale. At this size we would consider routing definition chunks through -small and reasoning chunks through -large, but that adds complexity. v1 ships with -large for everything.';
+  ccNote.textContent = n;
+}
+ccSlider.addEventListener('input', renderCC);
+document.querySelectorAll('#ccPresets .cc-preset').forEach(b => {
+  b.addEventListener('click', () => { ccSlider.value = b.dataset.tokens; renderCC(); });
+});
+renderCC();
+
+// ---------- TOC active ----------
+const tocLinks = document.querySelectorAll('#toc a');
+const sections = document.querySelectorAll('section.chapter');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      const id = e.target.id;
+      tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    }
+  });
+}, { rootMargin: '-40% 0px -55% 0px', threshold: 0 });
+sections.forEach(s => io.observe(s));
+
+tocLinks.forEach(a => {
+  a.addEventListener('click', (e) => {
+    const href = a.getAttribute('href');
+    if(href && href.startsWith('#')){
+      e.preventDefault();
+      const t = document.querySelector(href);
+      if(t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+
+const fadeIo = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); });
+}, { threshold: 0.08 });
+document.querySelectorAll('section.chapter, .surface, .pullquote').forEach(el => {
+  el.classList.add('fade');
+  fadeIo.observe(el);
+});
+</script>
+</body>
+</html>

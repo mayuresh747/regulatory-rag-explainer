@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Ingestion · Seattle Regulatory RAG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:252 250 246;--fg:28 25 23;--muted:87 83 78;--subtle:245 242 236;--line:220 215 207;--accent:217 119 6;--accent-soft:254 243 199;--good:22 101 52;--good-soft:220 240 226;--bad:153 27 27;--bad-soft:248 219 214;}
+html.dark{--bg:24 22 20;--fg:244 241 235;--muted:168 162 154;--subtle:36 33 30;--line:60 56 52;--accent:251 191 36;--accent-soft:68 50 18;--good:134 239 172;--good-soft:28 50 38;--bad:252 165 165;--bad-soft:60 30 28;}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:rgb(var(--bg));color:rgb(var(--fg));font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased;font-feature-settings:'ss01','cv11';}
+.serif{font-family:'Fraunces',Georgia,serif;font-feature-settings:'ss01';letter-spacing:-0.01em;}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;}
+.small-caps{font-family:'Inter',sans-serif;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:rgb(var(--muted));font-weight:500;}
+hr.rule{border:none;border-top:1px solid rgb(var(--line));margin:5rem 0;}
+.shell{max-width:72rem;margin:0 auto;padding:2.5rem 1.5rem 6rem;display:grid;grid-template-columns:1fr;gap:2rem;}
+@media(min-width:1024px){.shell{grid-template-columns:14rem 1fr;gap:4rem;padding-top:4rem;}}
+.toc-wrap{display:none;}
+@media(min-width:1024px){.toc-wrap{display:block;position:sticky;top:3rem;align-self:start;max-height:calc(100vh - 4rem);overflow:auto;}}
+.toc{list-style:none;padding:0;margin:0;}
+.toc li{margin:0.55rem 0;}
+.toc a{border:none;color:rgb(var(--muted));font-size:13px;display:flex;gap:0.6rem;transition:color .2s;text-decoration:none;}
+.toc a .num{font-variant-numeric:tabular-nums;opacity:0.55;min-width:1.4rem;}
+.toc a.active{color:rgb(var(--fg));font-weight:500;}
+.toc a.active .num{color:rgb(var(--accent));opacity:1;}
+.toc a:hover{color:rgb(var(--fg));}
+.toc-head{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgb(var(--muted));margin-bottom:1.25rem;}
+.col{max-width:36rem;}
+.hero h1{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(2.4rem,5vw,3.4rem);line-height:1.05;letter-spacing:-0.025em;margin:1rem 0 1.25rem;}
+.hero p.lead{font-size:1.1rem;color:rgb(var(--muted));max-width:32rem;}
+.byline{display:flex;gap:1.25rem;align-items:center;font-size:13px;color:rgb(var(--muted));margin-top:2.25rem;padding-top:1.5rem;border-top:1px solid rgb(var(--line));flex-wrap:wrap;}
+.dot{width:6px;height:6px;border-radius:50%;background:rgb(var(--accent));display:inline-block;}
+section.chapter{scroll-margin-top:4rem;padding:5rem 0 0;}
+section.chapter h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(1.7rem,3vw,2.1rem);letter-spacing:-0.02em;line-height:1.15;margin:0.5rem 0 1.5rem;max-width:32rem;}
+section.chapter p{max-width:36rem;margin:0 0 1.25rem;}
+section.chapter .small-caps{display:block;margin-bottom:0.5rem;}
+.surface{max-width:56rem;border:1px solid rgb(var(--line));background:rgb(var(--bg));border-radius:14px;padding:1.5rem;margin:2rem 0 2.5rem;}
+.surface .surface-head{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(var(--muted));margin-bottom:1rem;gap:1rem;}
+.surface .surface-head .badge{font-family:ui-monospace,monospace;letter-spacing:0;text-transform:none;padding:2px 8px;border-radius:999px;background:rgb(var(--subtle));color:rgb(var(--fg));font-size:11px;}
+code.mono{font-family:ui-monospace,monospace;font-size:13px;padding:1px 5px;background:rgb(var(--subtle));border-radius:4px;border:1px solid rgb(var(--line) / 0.7);}
+.theme-toggle{position:fixed;top:1rem;right:1rem;width:34px;height:34px;border-radius:50%;border:1px solid rgb(var(--line));background:rgb(var(--bg));cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgb(var(--fg));z-index:10;}
+footer{margin-top:7rem;padding-top:2rem;border-top:1px solid rgb(var(--line));font-size:13px;color:rgb(var(--muted));max-width:42rem;}
+.fade{opacity:0;transform:translateY(12px);transition:opacity .7s ease,transform .7s ease;}
+.fade.in{opacity:1;transform:none;}
+
+.fact-list{display:grid;gap:8px;}
+.fact{border:1px solid rgb(var(--line));border-radius:10px;background:rgb(var(--bg));padding:0.95rem 1.1rem;}
+.fact-head{display:flex;justify-content:space-between;gap:0.6rem;align-items:baseline;margin-bottom:0.5rem;}
+.fact-name{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:500;letter-spacing:-0.005em;}
+.fact-tag{font-family:ui-monospace,monospace;font-size:10.5px;padding:2px 8px;border-radius:999px;background:rgb(var(--subtle));color:rgb(var(--muted));flex-shrink:0;}
+.fact-tag.ours{background:rgb(var(--good-soft));color:rgb(var(--good));font-weight:500;}
+.fact-tag.bad{background:rgb(var(--bad-soft));color:rgb(var(--bad));}
+.fact-body{font-size:14px;color:rgb(var(--fg));line-height:1.55;}
+
+/* widget 1: parser comparison */
+.pc-tabs{display:flex;gap:0;border-bottom:1px solid rgb(var(--line));margin-bottom:1.25rem;flex-wrap:wrap;}
+.pc-tab{padding:0.6rem 1rem;cursor:pointer;font-size:12.5px;font-family:'Inter',sans-serif;color:rgb(var(--muted));border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;user-select:none;display:inline-flex;align-items:center;gap:6px;}
+.pc-tab:hover{color:rgb(var(--fg));}
+.pc-tab.active{color:rgb(var(--accent));border-bottom-color:rgb(var(--accent));font-weight:500;}
+.pc-tab .verdict{font-family:ui-monospace,monospace;font-size:10.5px;padding:1px 6px;border-radius:4px;background:rgb(var(--subtle));color:rgb(var(--muted));}
+.pc-tab.ours .verdict{background:rgb(var(--good-soft));color:rgb(var(--good));}
+.pc-output{font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.55;padding:1rem 1.15rem;background:rgb(var(--subtle));border-radius:10px;border:1px solid rgb(var(--line));white-space:pre-wrap;margin-bottom:1rem;overflow-x:auto;max-height:340px;overflow-y:auto;}
+.pc-output .ann{background:rgb(var(--bad-soft));color:rgb(var(--bad));padding:0 2px;border-radius:2px;}
+.pc-output .ok{background:rgb(var(--good-soft));color:rgb(var(--good));padding:0 2px;border-radius:2px;}
+.pc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;}
+@media (max-width: 720px){ .pc-stats{grid-template-columns:repeat(2,1fr);}}
+@media (max-width: 420px){ .pc-stats{grid-template-columns:1fr;}}
+.pc-stat{padding:0.55rem 0.75rem;background:rgb(var(--bg));border:1px solid rgb(var(--line));border-radius:8px;}
+.pc-stat-l{font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:rgb(var(--muted));font-weight:500;}
+.pc-stat-v{font-family:ui-monospace,monospace;font-size:13px;margin-top:2px;}
+.pc-stat-v.good{color:rgb(var(--good));}
+.pc-stat-v.bad{color:rgb(var(--bad));}
+.pc-stat-v.warn{color:rgb(var(--accent));}
+.pc-note{padding:0.85rem 1rem;background:rgb(var(--subtle));border-left:3px solid rgb(var(--accent));border-radius:0 8px 8px 0;font-size:13.5px;line-height:1.55;}
+.pc-note .lbl{font-family:ui-monospace,monospace;font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(var(--accent));margin-right:0.5rem;font-weight:600;}
+
+/* widget 2: pipeline animator */
+.pp-controls{display:flex;gap:8px;margin-bottom:1.25rem;align-items:center;}
+.pp-btn{padding:6px 14px;border-radius:6px;border:1px solid rgb(var(--accent));background:rgb(var(--accent));color:white;cursor:pointer;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;transition:all .15s;}
+.pp-btn:hover{filter:brightness(1.1);}
+.pp-btn.reset{background:rgb(var(--bg));color:rgb(var(--fg));border-color:rgb(var(--line));}
+.pp-flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;}
+.pp-step{flex:1 1 0;min-width:6rem;padding:0.7rem 0.6rem;text-align:center;border:1px solid rgb(var(--line));border-radius:10px;background:rgb(var(--bg));transition:all 0.45s cubic-bezier(.22,.61,.36,1);opacity:0.35;margin:4px 0;}
+.pp-step.lit{opacity:1;background:rgb(var(--good-soft) / 0.5);border-color:rgb(var(--good));box-shadow:0 2px 6px rgb(var(--good) / 0.15);transform:translateY(-2px);}
+.pp-step-name{font-family:'Fraunces',serif;font-size:1rem;font-weight:500;line-height:1.1;}
+.pp-step-meta{font-family:ui-monospace,monospace;font-size:10px;color:rgb(var(--muted));margin-top:3px;line-height:1.2;}
+.pp-step.lit .pp-step-meta{color:rgb(var(--good));}
+.pp-arrow{display:flex;align-items:center;justify-content:center;padding:0 8px;color:rgb(var(--muted));font-family:ui-monospace,monospace;font-size:14px;align-self:center;}
+.pp-arrow.lit{color:rgb(var(--good));}
+.pp-log{margin-top:1.25rem;font-family:ui-monospace,monospace;font-size:12px;line-height:1.55;padding:1rem;background:rgb(var(--subtle));border-radius:8px;border:1px solid rgb(var(--line));min-height:6rem;color:rgb(var(--fg));}
+.pp-log .line{display:block;}
+.pp-log .line .ts{color:rgb(var(--muted));margin-right:8px;}
+.pp-log .line.ok{color:rgb(var(--good));}
+.pp-log .line.warn{color:rgb(var(--accent));}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeBtn" aria-label="Toggle theme">◐</button>
+<div class="shell">
+  <aside class="toc-wrap">
+    <div class="toc-head">Contents</div>
+    <ul class="toc" id="toc">
+      <li><a href="#why"><span class="num">01</span><span>Why parsing matters</span></a></li>
+      <li><a href="#docling"><span class="num">02</span><span>Docling</span></a></li>
+      <li><a href="#ocr"><span class="num">03</span><span>OCR fallback</span></a></li>
+      <li><a href="#tables"><span class="num">04</span><span>Tables</span></a></li>
+      <li><a href="#normalize"><span class="num">05</span><span>Normalization</span></a></li>
+      <li><a href="#parsers"><span class="num">06</span><span>Parser comparison</span></a></li>
+      <li><a href="#pipeline"><span class="num">07</span><span>Pipeline animator</span></a></li>
+    </ul>
+  </aside>
+  <main>
+    <header class="hero col">
+      <div class="small-caps"><span class="dot"></span>&nbsp;&nbsp;Seattle Regulatory RAG · Ingestion</div>
+      <h1 class="serif">Ingestion</h1>
+      <p class="lead">Turning PDFs into clean Markdown that the chunkers can split safely. Docling for digital PDFs, Marker for scanned batches, and a normalization pass before anything reaches the chunker.</p>
+      <div class="byline">
+        <span>Docling primary</span><span>·</span><span>Marker for scanned</span><span>·</span><span>tables preserved as Markdown</span>
+      </div>
+    </header>
+
+    <section id="why" class="chapter">
+      <span class="small-caps">01 · Why parsing matters</span>
+      <h2 class="serif">Bad parsing is silent</h2>
+      <p>A parser that drops a row from a table, fuses two columns of a fee schedule, or misreads a section number does not throw an error. The chunk written downstream looks plausible. The retrieval downstream returns it confidently. The LLM cites it.</p>
+      <p>This is the most expensive class of bug in a regulatory RAG system because it surfaces only when a regulator opens the cited PDF and finds the number does not match. The defense is choosing a parser that respects document structure, then validating outputs against the source.</p>
+    </section>
+
+    <section id="docling" class="chapter">
+      <span class="small-caps">02 · Docling</span>
+      <h2 class="serif">Docling for digital PDFs</h2>
+      <p>The bulk of the corpus (SMC, WAC, RCW, IBC-WA, SPU Standards, most Director's Rules) is digital PDFs. Docling handles these as the primary parser. It exports structured Markdown with section headers, list items, and tables intact.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Why Docling</span><span class="badge">picked v1</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Table fidelity</span><span class="fact-tag ours">TableFormer model</span></div>
+            <div class="fact-body">Roughly 97% accuracy on complex regulatory tables, including merged cells and multi-level headers. The TableFormer head specifically targets dimensional standards, fee schedules, and similar structured rows.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Structure preservation</span><span class="fact-tag">native</span></div>
+            <div class="fact-body">Outputs Markdown with section headings as <code class="mono">## XX.YY.ZZZ</code>, list items as <code class="mono">- A.</code>, tables as pipe-separated Markdown. The chunker's regex patterns work directly on this output.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Speed</span><span class="fact-tag">about 6s / page</span></div>
+            <div class="fact-body">Slower than PyMuPDF4LLM (0.12s / page) but the accuracy delta is worth it. The corpus is ingested once per quarter; speed is not the bottleneck.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">License</span><span class="fact-tag">MIT</span></div>
+            <div class="fact-body">Permissive, no enterprise tier required. Models are downloaded on first use; runs offline thereafter.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="ocr" class="chapter">
+      <span class="small-caps">03 · OCR fallback</span>
+      <h2 class="serif">When the PDF is a scan</h2>
+      <p>Several Director's Rules from the 1980s and 1990s are scanned images, not digital text. Docling has integrated OCR that handles the small volume of these. For high-volume scanned batches (rare so far), Marker (built on Surya OCR) is the fallback: 25 pages per second on H100, 90+ languages, lightweight footprint.</p>
+      <p>Anything that touches OCR carries higher uncertainty than text-extracted PDFs. The chunker flags every OCR-sourced chunk with <code class="mono">is_scanned: true</code> and an <code class="mono">ocr_confidence</code> score so downstream retrieval can de-prioritize them when the corpus has a digital alternative.</p>
+    </section>
+
+    <section id="tables" class="chapter">
+      <span class="small-caps">04 · Tables</span>
+      <h2 class="serif">Tables are first-class</h2>
+      <p>For regulatory questions, tables are where the answer lives. Dimensional standards, fee schedules, parking minimums, setback requirements: most numbers a user actually asks about appear in tables.</p>
+      <p>Docling extracts tables as separate first-class items. The chunker pulls them out, tags them with <code class="mono">content_type: "table"</code>, classifies them by content (<code class="mono">dimensional</code>, <code class="mono">fee_schedule</code>, <code class="mono">zoning</code>), and embeds them as Markdown text rather than flattening to prose. The retriever can filter to tables-only when the user asks for numbers.</p>
+    </section>
+
+    <section id="normalize" class="chapter">
+      <span class="small-caps">05 · Normalization</span>
+      <h2 class="serif">What "normalized" means here</h2>
+      <p>Between Docling's output and the chunker's input, every document passes through a normalization step in <code class="mono">src/chunkers/base.py</code>:</p>
+      <div class="surface">
+        <div class="surface-head"><span>Normalization passes</span></div>
+        <div class="fact-list">
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Strip image artifacts</span><span class="fact-tag">regex</span></div>
+            <div class="fact-body">Docling sometimes emits <code class="mono">&lt;!-- image --&gt;</code> placeholders for figures. These are removed before chunking; they have no embedding value.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Strip zero-width characters</span><span class="fact-tag">unicode</span></div>
+            <div class="fact-body">Zero-width joiners, soft hyphens, BOMs. These break BM25 token matching and add noise to embeddings.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Collapse excess whitespace</span><span class="fact-tag">cleanup</span></div>
+            <div class="fact-body">Three or more consecutive newlines collapse to two. Helps the chunker's paragraph-aware regex match consistently.</div>
+          </div>
+          <div class="fact">
+            <div class="fact-head"><span class="fact-name">Minimum chunk size</span><span class="fact-tag">20 tokens</span></div>
+            <div class="fact-body">Chunks below 20 tokens after splitting are garbage (stubs, image-only pages, stray headers) and get dropped. The threshold is set in <code class="mono">MIN_CHUNK_TOKENS</code>.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="parsers" class="chapter">
+      <span class="small-caps">06 · Parser comparison</span>
+      <h2 class="serif">Same pages, three parsers</h2>
+      <p>Pages 829-832 of SMC Title 23 (Land Use Code), the section that defines 23.54.030 (parking space and access standards), parsed by three libraries. Real outputs; measured times. Source PDF and raw outputs are in <code class="mono">docs/explainers/results/parser_comparison/</code>.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Parser output</span><span class="badge">SMC Title 23 · pp. 829-832 · 5 pages</span></div>
+        <div class="pc-tabs" id="pcTabs">
+          <div class="pc-tab ours active" data-pc="0">Docling<span class="verdict">ours</span></div>
+          <div class="pc-tab" data-pc="1">PyMuPDF4LLM<span class="verdict">fastest md</span></div>
+          <div class="pc-tab" data-pc="2">pdfplumber<span class="verdict">raw text</span></div>
+        </div>
+        <div class="pc-output" id="pcOutput"></div>
+        <div class="pc-stats" id="pcStats"></div>
+        <div class="pc-note"><span class="lbl">Read</span><span id="pcNote"></span></div>
+      </div>
+    </section>
+
+    <section id="pipeline" class="chapter">
+      <span class="small-caps">07 · Pipeline animator</span>
+      <h2 class="serif">A document moving through ingestion</h2>
+      <p>Press play and watch one PDF flow from disk to ready-to-embed chunks. Each stage lights up as it executes and writes a line to the log.</p>
+      <div class="surface">
+        <div class="surface-head"><span>Ingestion pipeline</span><span class="badge" id="ppBadge">SMC 23.54.030 (digital, 1 page)</span></div>
+        <div class="pp-controls">
+          <button class="pp-btn" id="ppPlay">Play ingestion</button>
+          <button class="pp-btn reset" id="ppReset">Reset</button>
+        </div>
+        <div class="pp-flow" id="ppFlow"></div>
+        <div class="pp-log" id="ppLog"></div>
+      </div>
+    </section>
+
+    <hr class="rule" />
+    <footer><p style="margin-top:1.5rem;" class="small-caps">Seattle Regulatory RAG · Ingestion · 2026</p></footer>
+  </main>
+</div>
+<script>
+function setTheme(t){ if(t==='dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); try{localStorage.setItem('theme',t);}catch(e){} }
+document.getElementById('themeBtn').addEventListener('click', () => setTheme(document.documentElement.classList.contains('dark')?'light':'dark'));
+(function(){try{const s=localStorage.getItem('theme'); if(s)setTheme(s); else if(window.matchMedia('(prefers-color-scheme: dark)').matches)setTheme('dark');}catch(e){}})();
+
+// ---------- WIDGET 1: PARSER COMPARISON ----------
+// Real outputs measured on 2026-05-17. Test PDF: SMC Title 23 pages 829-832 (5 pages),
+// the section defining 23.54.030 parking space standards.
+// Raw outputs in docs/explainers/results/parser_comparison/.
+const parsers = [
+  { name:'Docling', tag:'ours',
+    output:`23.54.030 - Parking space and access standards
+
+All parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030.
+
+## A. Parking space dimensions
+
+1. "Large vehicle" means the minimum size of a large vehicle parking space shall be 8 feet in width and 19 feet in length.
+2. "Medium vehicle" means the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length.
+
+3.
+
+- "Small vehicle" means the minimum size of a small vehicle parking space shall be 7.5 feet in width and 15 feet in length.
+4. "Barrier-free parking" means a parking space meeting the following standards:
+- a. Parking spaces shall not be less than 8 feet in width and shall have an adjacent access aisle not less than 5 feet in width.`,
+    stats:[ {l:'speed', v:'1.23 s / page', tone:'warn'}, {l:'md headers', v:'7 detected', tone:'good'}, {l:'footer artifacts', v:'stripped', tone:'good'}, {l:'output size', v:'13,084 chars', tone:''} ],
+    note:'Recognized A. as a Markdown heading. Stripped the "about:blank 829/1641" and "1/7/26, 4:11 PM Seattle, WA Municipal Code" page-footer artifacts. Item 3 was split across a hard page break in the PDF and shows the discontinuity, but the text is preserved and the chunker can stitch it. This is what the per-agency chunker expects as input.' },
+  { name:'PyMuPDF4LLM', tag:'fast',
+    output:`23.54.030 - Parking space and access standards
+
+All parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall meet the standards of this Section 23.54.030.
+
+- A. Parking space dimensions
+
+   1. "Large vehicle" means the minimum size of a large vehicle parking space shall be 8 feet in width and 19 feet in length.
+
+   2. "Medium vehicle" means the minimum size of a medium vehicle parking space shall be 8 feet in width and 16 feet in length.
+
+3.
+
+about:blank
+
+829/1641
+
+Seattle, WA Municipal Code
+
+1/7/26, 4:11 PM
+
+"Small vehicle" means the minimum size of a small vehicle parking space shall be 7.5 feet in width and 15 feet in length.`,
+    stats:[ {l:'speed', v:'0.18 s / page', tone:'good'}, {l:'md headers', v:'6 detected', tone:'warn'}, {l:'footer artifacts', v:'present', tone:'bad'}, {l:'output size', v:'13,717 chars', tone:''} ],
+    note:'~7x faster than Docling. But the page-bottom Seattle web footer ("about:blank 829/1641", "Seattle, WA Municipal Code", "1/7/26, 4:11 PM") gets injected inline between item 3 and its definition. A chunker reading this would either embed the footer as content or need an extra cleanup pass. Section A. is rendered as a list item with "-" prefix instead of a heading.' },
+  { name:'pdfplumber', tag:'raw',
+    output:`23.54.030 - Parking space and access standards
+All parking spaces provided, whether required by Section 23.54.015 or not, and required barrier-free parking, shall
+meet the standards of this Section 23.54.030.
+A. Parking space dimensions
+1. "Large vehicle" means the minimum size of a large vehicle parking space shall be 8 feet in width
+and 19 feet in length.
+2. "Medium vehicle" means the minimum size of a medium vehicle parking space shall be 8 feet in
+width and 16 feet in length.
+3.
+about:blank 829/1641
+# Page 3
+1/7/26, 4:11 PM Seattle, WA Municipal Code
+"Small vehicle" means the minimum size of a small vehicle parking space shall be 7.5 feet in width and 15 feet in
+length.`,
+    stats:[ {l:'speed', v:'0.10 s / page', tone:'good'}, {l:'md headers', v:'none', tone:'warn'}, {l:'footer artifacts', v:'present', tone:'bad'}, {l:'tables detected', v:'0 of 5 pages', tone:'warn'} ],
+    note:'Fastest of the three. But no Markdown structure (no headings, no lists). Footer artifacts intact. Coordinate-aware table detection returned 0 tables across all 5 pages because Title 23\'s "tables" are actually formatted as numbered-list prose, not as grid layouts. Building a regulatory chunker on pdfplumber means writing the layout reassembly yourself.' }
+];
+const pcTabs = document.getElementById('pcTabs');
+const pcOutput = document.getElementById('pcOutput');
+const pcStats = document.getElementById('pcStats');
+const pcNote = document.getElementById('pcNote');
+function renderPC(i){
+  pcTabs.querySelectorAll('.pc-tab').forEach((el,j) => el.classList.toggle('active', j===i));
+  const p = parsers[i];
+  pcOutput.textContent = p.output;
+  pcStats.textContent = '';
+  p.stats.forEach(s => {
+    const d = document.createElement('div'); d.className = 'pc-stat';
+    const l = document.createElement('div'); l.className = 'pc-stat-l'; l.textContent = s.l;
+    const v = document.createElement('div'); v.className = 'pc-stat-v ' + (s.tone || ''); v.textContent = s.v;
+    d.appendChild(l); d.appendChild(v);
+    pcStats.appendChild(d);
+  });
+  pcNote.textContent = p.note;
+}
+pcTabs.querySelectorAll('.pc-tab').forEach((el,i) => el.addEventListener('click', () => renderPC(i)));
+renderPC(0);
+
+// ---------- WIDGET 2: PIPELINE ANIMATOR ----------
+// Steps mirror src/ingestion/pipeline.py + src/ingestion/parser.py.
+// Kuzu graph writes are NOT part of this pipeline; they run later in scripts/build_graph.py.
+const ppSteps = [
+  { name:'Scan + manifest filter', meta:'sub-second', log:['scan_agency_pdfs(\'smc\') walked /All Documents/Seattle Municipal Code', 'found 27 PDFs', 'manifest skipped 27 already-complete; this run will process SMC_23.54.030.pdf'] },
+  { name:'Docling parse', meta:'1-6 s / page', log:['create_converter() with TableFormerMode.ACCURATE, do_ocr=True', 'converter.convert(SMC_23.54.030.pdf)', 'export_to_markdown() returned 12,841 chars', 'doc.tables = 0 (Title 23 dimensions are prose, not grids)', 'page text density 2,140 chars/page, OCR not triggered'] },
+  { name:'Detect image artifacts + normalize', meta:'<1 ms', log:['_IMAGE_ARTIFACT_RE.search() = no <!-- image --> markers found', 'normalize_text() collapsed whitespace, stripped control chars'] },
+  { name:'Per-agency chunker', meta:'10-60 ms', log:['get_chunker(\'smc\') = SMCChunker', 'regex matched section header: 23.54.030', 'sub-chunked at A. / B. / C. boundaries', 'stripped ordinance history (Ord. 125652, § 7, 2018; ...)', 'produced 4 ChunkData objects'] },
+  { name:'Assign index + propagate doc fields', meta:'<1 ms', log:['chunk_index = 0..3', 'has_images = False, is_scanned = False', 'ocr_confidence = None'] },
+  { name:'Buffer + batched embed', meta:'OpenAI', log:['buffered with other SMC chunks; flushes every 1,000 chunks (EMBED_BATCH_SIZE × 10)', 'batch sent to text-embedding-3-large in groups of 100', 'received 4 × 3072d float vectors', 'token cost tracked by OpenAIEmbedder.get_cost_summary()'] },
+  { name:'LanceDBWriter.add()', meta:'commit', log:['inserted 4 rows into chunks table (vector + 24 metadata columns)', 'manifest.mark_complete(SMC_23.54.030.pdf, 4)', 'ready for retrieval. Graph edges (NEXT_SECTION, CITES, ...) get built later by scripts/build_graph.py.'] }
+];
+const ppFlow = document.getElementById('ppFlow');
+const ppLog = document.getElementById('ppLog');
+const ppPlay = document.getElementById('ppPlay');
+const ppReset = document.getElementById('ppReset');
+let ppState = { step:0, playing:false, timer:null };
+function renderPP(){
+  ppFlow.textContent = '';
+  ppSteps.forEach((s,i) => {
+    const card = document.createElement('div');
+    card.className = 'pp-step' + (i < ppState.step ? ' lit' : '');
+    const nm = document.createElement('div'); nm.className = 'pp-step-name'; nm.textContent = s.name;
+    const mt = document.createElement('div'); mt.className = 'pp-step-meta'; mt.textContent = s.meta;
+    card.appendChild(nm); card.appendChild(mt);
+    ppFlow.appendChild(card);
+    if(i < ppSteps.length - 1){
+      const a = document.createElement('div'); a.className = 'pp-arrow' + (i < ppState.step - 1 ? ' lit' : ''); a.textContent = '→';
+      ppFlow.appendChild(a);
+    }
+  });
+}
+function ppAdvance(){
+  if(ppState.step >= ppSteps.length){ ppState.playing = false; ppPlay.textContent = 'Play ingestion'; return; }
+  const s = ppSteps[ppState.step];
+  const ts = (ppState.step * 0.6).toFixed(1).padStart(4) + 's';
+  s.log.forEach((line, idx) => {
+    const div = document.createElement('div');
+    div.className = 'line' + (idx === s.log.length - 1 && ppState.step === ppSteps.length - 1 ? ' ok' : '');
+    const t = document.createElement('span'); t.className = 'ts'; t.textContent = ts;
+    div.appendChild(t); div.appendChild(document.createTextNode(line));
+    ppLog.appendChild(div);
+    ppLog.scrollTop = ppLog.scrollHeight;
+  });
+  ppState.step += 1;
+  renderPP();
+  if(ppState.playing){ ppState.timer = setTimeout(ppAdvance, 950); }
+}
+ppPlay.addEventListener('click', () => {
+  if(ppState.playing){ ppState.playing = false; clearTimeout(ppState.timer); ppPlay.textContent = 'Resume'; return; }
+  if(ppState.step >= ppSteps.length){ ppState.step = 0; ppLog.textContent = ''; renderPP(); }
+  ppState.playing = true;
+  ppPlay.textContent = 'Pause';
+  ppAdvance();
+});
+ppReset.addEventListener('click', () => { ppState.playing = false; clearTimeout(ppState.timer); ppState.step = 0; ppLog.textContent = ''; ppPlay.textContent = 'Play ingestion'; renderPP(); });
+renderPP();
+
+// TOC + fade-in
+const tocLinks = document.querySelectorAll('#toc a');
+const sections = document.querySelectorAll('section.chapter');
+const io = new IntersectionObserver((entries) => { entries.forEach(e => { if(e.isIntersecting){ const id=e.target.id; tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href')==='#'+id)); }}); }, { rootMargin: '-40% 0px -55% 0px', threshold:0 });
+sections.forEach(s => io.observe(s));
+tocLinks.forEach(a => a.addEventListener('click', (e) => { const h=a.getAttribute('href'); if(h && h.startsWith('#')){ e.preventDefault(); const t=document.querySelector(h); if(t) t.scrollIntoView({behavior:'smooth',block:'start'}); }}));
+const fadeIo = new IntersectionObserver((entries) => entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); }), { threshold:0.08 });
+document.querySelectorAll('section.chapter, .surface').forEach(el => { el.classList.add('fade'); fadeIo.observe(el); });
+</script>
+</body>
+</html>
