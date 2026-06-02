@@ -15,6 +15,7 @@
     .level-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; } .level-card { padding:12px; } .level-card p { color:var(--muted); font-size:13px; }
     table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; margin-bottom:16px; } th,td { padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#eeeeea; font-size:13px; } tr:last-child td { border-bottom:0; }
     .status { border-radius:999px; padding:3px 8px; font-size:12px; font-weight:700; } .status.ready { color:#fff; background:var(--ok); } .status.soon { color:#fff; background:var(--soon); }
+    details.judge-detail { border:1px solid var(--line); border-radius:8px; background:#fff; margin:10px 0; overflow:hidden; } details.judge-detail > summary { cursor:pointer; padding:12px 14px; font-weight:700; color:var(--accent); background:#fafaf8; } .judge-body { padding:14px; border-top:1px solid var(--line); } .judge-body dl { display:grid; grid-template-columns:150px 1fr; gap:8px 12px; margin:0 0 12px; } .judge-body dt { font-weight:700; color:var(--muted); } .judge-body dd { margin:0; } .judge-body pre { white-space:pre-wrap; overflow:auto; background:#f5f5f1; border:1px solid var(--line); border-radius:8px; padding:10px; font-size:12px; }
     .filters { position:sticky; top:0; z-index:2; background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; margin:12px 0; box-shadow:0 3px 14px rgba(0,0,0,.06); }
     .filter-grid { display:grid; grid-template-columns:repeat(5,minmax(150px,1fr)); gap:10px; align-items:end; } .filter-control label { display:block; color:var(--muted); font-size:12px; font-weight:700; margin-bottom:4px; }
     .filter-control select,.filter-control input { width:100%; border:1px solid var(--line); border-radius:6px; background:#fbfbf8; color:var(--ink); font:inherit; min-height:36px; padding:6px 8px; }
@@ -82,6 +83,40 @@
     <h2>Judge Suite</h2>
     <p>Each answer is judged independently. The available LLM judges use Claude Opus 4.8 at temperature 0; deterministic citation metrics do not use an LLM. Only Exp1a-1 and Exp1b results are available in this report. The remaining judge outputs are planned and marked coming soon.</p>
     <table><thead><tr><th>Judge</th><th>What it measures</th><th>How it judges</th><th>Status</th></tr></thead><tbody><tr><td><b>Exp1a-1</b></td><td>Numeric correctness</td><td>Claude Opus 4.8 independently checks whether every required gold number is present, unit-equivalent where needed, and not contradicted.</td><td><span class="status ready">Available</span></td></tr><tr><td><b>Exp1b</b></td><td>Evidence support / grounding</td><td>Claude Opus 4.8 checks whether the answer is grounded in the authoritative gold quote and cites the correct required source.</td><td><span class="status ready">Available</span></td></tr><tr><td><b>Exp1c</b></td><td>Citation hallucination</td><td>Deterministic citation checks measure fabricated citations and citations that are real but not among the gold sources.</td><td><span class="status soon">Coming soon</span></td></tr><tr><td><b>Exp2a</b></td><td>Multi-source combination</td><td>Claude Opus 4.8 scores whether multi-section and multi-agency answers correctly combine all required sources.</td><td><span class="status soon">Coming soon</span></td></tr><tr><td><b>Exp2b</b></td><td>Multi-source evidence support</td><td>Claude Opus 4.8 applies groundedness and correct-source checks to the multi-citation subset.</td><td><span class="status soon">Coming soon</span></td></tr><tr><td><b>Exp2c</b></td><td>Hallucination delta</td><td>Deterministic scoring compares simple-question citation hallucination against multi-source-question hallucination.</td><td><span class="status soon">Coming soon</span></td></tr><tr><td><b>Exp2d</b></td><td>Citation precision / recall</td><td>Deterministic matching computes citation precision, recall, and F1 against required gold citations.</td><td><span class="status soon">Coming soon</span></td></tr><tr><td><b>Exp3</b></td><td>Conflict detection</td><td>Claude Opus 4.8 checks whether systems surface both values when the source material contains a cross-authority conflict.</td><td><span class="status soon">Coming soon</span></td></tr><tr><td><b>Exp4</b></td><td>False-premise handling</td><td>Claude Opus 4.8 checks whether systems detect adversarial or invalid questions and handle them correctly.</td><td><span class="status soon">Coming soon</span></td></tr></tbody></table>
+    <h3>Exact Judge Details</h3>
+    <p class="muted">Expand a judge to see the exact scoring contract used for this report. Per-answer judge outputs and rationales are shown inside the question cards below.</p>
+    <details class="judge-detail">
+      <summary>Exp1a-1 exact judging details: binary numeric correctness</summary>
+      <div class="judge-body">
+        <dl><dt>Model</dt><dd>Claude Opus 4.8, temperature 0</dd><dt>Scope</dt><dd>Numeric-answerable questions only: every gold item with a non-empty <code>numeric_value</code>. Pure unanswerable L6 items are excluded from Exp1a-1.</dd><dt>Inputs per answer</dt><dd>Question, gold numeric answer(s) and unit(s), gold reference answer for context, and the candidate answer text.</dd><dt>Decision rule</dt><dd><code>correct = true</code> only when every required gold number is matched exactly or by standard unit conversion and no required value is contradicted elsewhere in the answer.</dd></dl>
+        <h4>System prompt</h4>
+        <pre>You are an impartial numeric-correctness judge for a Seattle/Washington regulatory-RAG benchmark. You are given a question, the gold-standard numeric answer(s) with their units, and a candidate answer produced by a system under test. Decide whether the candidate states the correct number(s). Do NOT answer the question yourself and do NOT reward fluent prose - only whether the required numeric value(s) are present and correct. A gold number is matched if the candidate states an equal value either exactly or after standard unit conversion (e.g. 96 inches == 8 feet, 1 acre == 43,560 square feet). It is NOT matched if absent, wrong, or contradicted elsewhere in the answer. Return valid JSON only - no prose, no code fences.</pre>
+        <h4>Required response schema</h4>
+        <pre>{
+  "per_number": [
+    {"gold_value": &lt;number&gt;, "gold_unit": "&lt;unit&gt;", "matched": true|false,
+     "found_as": "&lt;the value the candidate stated for this quantity, or null&gt;"}
+  ],
+  "correct": true|false,
+  "rationale": "&lt;one or two sentences&gt;"
+}</pre>
+      </div>
+    </details>
+    <details class="judge-detail">
+      <summary>Exp1b exact judging details: evidence support and correct source</summary>
+      <div class="judge-body">
+        <dl><dt>Model</dt><dd>Claude Opus 4.8, temperature 0</dd><dt>Scope</dt><dd>All questions, L1 through L6, including answerable and unanswerable or false-premise items.</dd><dt>Inputs per answer</dt><dd>Question, gold numeric answer(s), authoritative gold source citations and verbatim source text, gold reference answer, candidate answer, and candidate-cited sources.</dd><dt>Decision rule</dt><dd><code>supported = grounded AND correct_source</code>. A right numeric answer with missing, wrong, or fabricated evidence is not supported.</dd></dl>
+        <h4>System prompt</h4>
+        <pre>You are an impartial evidence-support judge for a Seattle/Washington regulatory-RAG benchmark. You are given a question, the authoritative gold source text (verbatim quotes from the controlling code sections) and the required source citations, plus a candidate answer and the sources the candidate cited. Decide two things: (1) GROUNDED - are the candidate's substantive claims (especially any numeric value) consistent with the authoritative gold source text? (2) CORRECT_SOURCE - does the candidate cite the correct required source(s) (right section/document), not fabricated or wrong ones? An answer is SUPPORTED only if it is BOTH grounded AND cites the correct source. A right answer attached to wrong, missing, or fabricated evidence is NOT supported. Do not answer the question yourself. Return valid JSON only - no prose, no code fences.</pre>
+        <h4>Required response schema</h4>
+        <pre>{
+  "grounded": true|false,
+  "correct_source": true|false,
+  "supported": true|false,
+  "rationale": "&lt;one or two sentences&gt;"
+}</pre>
+      </div>
+    </details>
   </section>
 
   <section class="section">
